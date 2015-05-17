@@ -1,8 +1,9 @@
-package org.mail.git;
+package org.mail.git.util;
 
 import org.junit.*;
 
 import java.io.*;
+import java.util.Arrays;
 
 import static org.junit.Assert.*;
 
