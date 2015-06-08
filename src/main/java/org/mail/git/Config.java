@@ -41,7 +41,7 @@ public class Config {
 
 	private static final Logger LOG = LoggerFactory.getLogger(Config.class);
 	private static final String DEF_SUBJ = "[{0}]@{1,date,yyyy-MM-dd'T'HH:mm:ssZ}/{2}";
-	private static final String DEF_BODY = "";
+	private static final String DEF_BODY = "Transporting file \"{2}\"<br>";
 	private static final String[] NO_ADDR = new String[0];
 
 	private final String ewsEmail;
@@ -49,6 +49,8 @@ public class Config {
 	private final String ewsUsername;
 	private final String ewsPassword;
 	private final String ewsServer;
+	private final int ewsViewSize;
+	private final int ewsSubscriptionLifetime;
 
 	private final String proxyHost;
 	private final int proxyPort;
@@ -59,9 +61,7 @@ public class Config {
 	private final String outboxFolder;
 	private final boolean outboxCleanup;
 	private final String outboxFileRegexp;
-
 	private final String inboxFolder;
-	private final boolean inboxCleanup;
 
 	private final String emailTag;
 	private final MessageFormat emailSubjectFormat;
@@ -69,13 +69,17 @@ public class Config {
 	private final String[] emailRecipientsTo;
 	private final String[] emailRecipientsCc;
 	private final String[] emailRecipientsBcc;
+	private final boolean emailInboxCleanup;
 	private final String emailAttachPassword;
 	private final boolean emailAttachGzip;
+	private final String emailAttachExtGzip;
+	private final String emailAttachExtEnc;
 
 	public Config(String propertiesFileName) throws IOException {
 		Properties config = new Properties();
 		config.load(new FileInputStream(propertiesFileName));
 		String s;
+		int i;
 		MessageFormat mf;
 
 		ewsEmail = config.getProperty("ews.email", "");
@@ -83,6 +87,12 @@ public class Config {
 		ewsUsername = config.getProperty("ews.username", "");
 		ewsPassword = config.getProperty("ews.password", "");
 		ewsServer = config.getProperty("ews.server", "");
+		s = config.getProperty("ews.view.size", "");
+		ewsViewSize = s.isEmpty() ? 500 : Integer.parseInt(s);
+		s = config.getProperty("ews.subscription.lifetime", "");
+		i = s.isEmpty() ? 10 : Integer.parseInt(s);
+		if (i < 1 || i > 30) i = 10;
+		ewsSubscriptionLifetime = i;
 
 		proxyHost = config.getProperty("proxy.host", "");
 		s = config.getProperty("proxy.port", "");
@@ -96,11 +106,8 @@ public class Config {
 		s = config.getProperty("outbox.cleanup", "");
 		outboxCleanup = s.isEmpty() || Boolean.parseBoolean(s);
 		outboxFileRegexp = config.getProperty("outbox.file.regexp", "");
-
 		s = config.getProperty("inbox.folder", "");
 		inboxFolder = s.isEmpty() ? System.getProperty("java.io.tmpdir") + File.separator + "inbox" : s;
-		s = config.getProperty("inbox.cleanup", "");
-		inboxCleanup = s.isEmpty() || Boolean.parseBoolean(s);
 
 		s = config.getProperty("email.tag", "");
 		emailTag = s.isEmpty() ? "git-ews" : s;
@@ -125,6 +132,9 @@ public class Config {
 		}
 		emailBodyFormat = mf;
 
+		s = config.getProperty("email.inbox.cleanup", "");
+		emailInboxCleanup = s.isEmpty() || Boolean.parseBoolean(s);
+
 		s = config.getProperty("email.recipients.to", "");
 		emailRecipientsTo = s.isEmpty() ? NO_ADDR : Utils.ensureEmpty(s.split("\\s*,\\s*"));
 		s = config.getProperty("email.recipients.cc", "");
@@ -135,6 +145,11 @@ public class Config {
 		emailAttachPassword = config.getProperty("email.attach.password", "");
 		s = config.getProperty("email.attach.gzip", "");
 		emailAttachGzip = !s.isEmpty() && Boolean.parseBoolean(s);
+
+		s = config.getProperty("email.attach.ext.gzip", "");
+		emailAttachExtGzip = s.isEmpty() ? ".gz" : s;
+		s = config.getProperty("email.attach.ext.enc", "");
+		emailAttachExtEnc = s.isEmpty() ? ".enc" : s;
 	}
 
 	public String getEwsEmail() {
@@ -155,6 +170,14 @@ public class Config {
 
 	public String getEwsServer() {
 		return ewsServer;
+	}
+
+	public int getEwsViewSize() {
+		return ewsViewSize;
+	}
+
+	public int getEwsSubscriptionLifetime() {
+		return ewsSubscriptionLifetime;
 	}
 
 	public String getProxyHost() {
@@ -193,8 +216,8 @@ public class Config {
 		return inboxFolder;
 	}
 
-	public boolean isInboxCleanup() {
-		return inboxCleanup;
+	public boolean isEmailInboxCleanup() {
+		return emailInboxCleanup;
 	}
 
 	public String getEmailTag() {
@@ -229,32 +252,44 @@ public class Config {
 		return emailAttachGzip;
 	}
 
+	public String getEmailAttachExtGzip() {
+		return emailAttachExtGzip;
+	}
+
+	public String getEmailAttachExtEnc() {
+		return emailAttachExtEnc;
+	}
+
 	@Override
 	public String toString() {
 		return "Config {" +
-				"ewsEmail='" + ewsEmail + '\'' +
-				", ewsDomain='" + ewsDomain + '\'' +
-				", ewsUsername='" + ewsUsername + '\'' +
-				", ewsPassword='" + ewsPassword + '\'' +
-				", ewsServer='" + ewsServer + '\'' +
-				", proxyHost='" + proxyHost + '\'' +
-				", proxyPort=" + proxyPort +
-				", proxyUsername='" + proxyUsername + '\'' +
-				", proxyPassword='" + proxyPassword + '\'' +
-				", proxyDomain='" + proxyDomain + '\'' +
-				", outboxFolder='" + outboxFolder + '\'' +
-				", outboxCleanup=" + outboxCleanup +
-				", outboxFileRegexp='" + outboxFileRegexp + '\'' +
-				", inboxFolder='" + inboxFolder + '\'' +
-				", inboxCleanup=" + inboxCleanup +
-				", emailTag='" + emailTag + '\'' +
-				", emailSubjectFormat=" + emailSubjectFormat +
-				", emailBodyFormat=" + emailBodyFormat +
-				", emailRecipientsTo=" + Arrays.toString(emailRecipientsTo) +
-				", emailRecipientsCc=" + Arrays.toString(emailRecipientsCc) +
-				", emailRecipientsBcc=" + Arrays.toString(emailRecipientsBcc) +
-				", emailAttachPassword='" + emailAttachPassword + '\'' +
-				", emailAttachGzip=" + emailAttachGzip +
+				"\n\tewsEmail='" + ewsEmail + '\'' +
+				",\n\tewsDomain='" + ewsDomain + '\'' +
+				",\n\tewsUsername='" + ewsUsername + '\'' +
+				",\n\tewsPassword='********'" +
+				",\n\tewsServer='" + ewsServer + '\'' +
+				",\n\tewsViewSize=" + ewsViewSize +
+				",\n\tewsSubscriptionLifetime=" + ewsSubscriptionLifetime +
+				",\n\tproxyHost='" + proxyHost + '\'' +
+				",\n\tproxyPort=" + proxyPort +
+				",\n\tproxyUsername='" + proxyUsername + '\'' +
+				",\n\tproxyPassword='" + proxyPassword + '\'' +
+				",\n\tproxyDomain='" + proxyDomain + '\'' +
+				",\n\toutboxFolder='" + outboxFolder + '\'' +
+				",\n\toutboxCleanup=" + outboxCleanup +
+				",\n\toutboxFileRegexp='" + outboxFileRegexp + '\'' +
+				",\n\tinboxFolder='" + inboxFolder + '\'' +
+				",\n\temailTag='" + emailTag + '\'' +
+				",\n\temailSubjectFormat='" + emailSubjectFormat.toPattern() + '\'' +
+				",\n\temailBodyFormat='" + emailBodyFormat.toPattern() + '\'' +
+				",\n\temailInboxCleanup=" + emailInboxCleanup +
+				",\n\temailRecipientsTo=" + Arrays.toString(emailRecipientsTo) +
+				",\n\temailRecipientsCc=" + Arrays.toString(emailRecipientsCc) +
+				",\n\temailRecipientsBcc=" + Arrays.toString(emailRecipientsBcc) +
+				",\n\temailAttachPassword='" + Utils.repeat("*", emailAttachPassword.length()) + '\'' +
+				",\n\temailAttachGzip=" + emailAttachGzip +
+				",\n\temailAttachExtGzip='" + emailAttachExtGzip + '\'' +
+				",\n\temailAttachExtEnc='" + emailAttachExtEnc + '\'' +
 				'}';
 	}
 }

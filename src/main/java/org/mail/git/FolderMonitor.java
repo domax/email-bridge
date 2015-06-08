@@ -31,9 +31,7 @@ import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
 import java.nio.file.*;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
 import static java.nio.file.StandardWatchEventKinds.ENTRY_CREATE;
 import static java.nio.file.StandardWatchEventKinds.OVERFLOW;
@@ -41,16 +39,17 @@ import static java.nio.file.StandardWatchEventKinds.OVERFLOW;
 /**
  * @author <a href="mailto:max@dominichenko.com">Maksym Dominichenko</a>
  */
-public class FolderMonitor implements Runnable {
-
-	public interface Callback {
-		void onNewFile(File file) throws IOException;
-	}
+public class FolderMonitor extends AbstractMonitor implements Runnable {
 
 	private static final Logger LOG = LoggerFactory.getLogger(FolderMonitor.class);
 
+	public static class SendFileMessage extends Message<List<File>> {
+		public SendFileMessage(List<File> data) {
+			super(data);
+		}
+	}
+
 	private final Config config;
-	private final List<Callback> callbacks = new ArrayList<>();
 	private final File outboxFolder;
 	private final WatchService watcher;
 
@@ -74,70 +73,82 @@ public class FolderMonitor implements Runnable {
 				throw new IOException("Specified folder '" + outboxFolder.getAbsolutePath() + "' has insufficient permissions");
 		} else if (!outboxFolder.mkdirs())
 			throw new IOException("Cannot prepare folder '" + outboxFolder.getAbsolutePath() + "' for work");
-		LOG.info("instantiated");
+		LOG.debug("Instantiated");
 	}
 
-	public FolderMonitor addCallback(Callback callback) {
-		if (callback != null && !callbacks.contains(callback))
-			callbacks.add(callback);
-		return this;
+	public FolderMonitor addStopCallback(MonitorCallback<String> callback) {
+		return (FolderMonitor) addCallback(Main.StopMessage.class, callback);
 	}
 
-	private void processFile(File file) throws IOException {
-		LOG.info("process file: " + file.getAbsolutePath());
-		for (Callback callback : callbacks)
-			callback.onNewFile(file);
-		if (config.isOutboxCleanup() && !file.delete())
-			LOG.warn("Cannot remove file '" + file.getAbsolutePath() + "'");
+	public FolderMonitor addSendFileCallback(MonitorCallback<List<File>> callback) {
+		return (FolderMonitor) addCallback(SendFileMessage.class, callback);
 	}
 
-	public FolderMonitor scanInbox() throws IOException {
+	private void processFiles(List<File> files) throws IOException {
+		LOG.debug("Process files '{}'", files);
+		if (Utils.isEmpty(files)) return;
+		postMessage(new SendFileMessage(files));
+	}
+
+	@Override
+	public synchronized FolderMonitor scan() {
+		LOG.info("Start scanning '{}' folder", outboxFolder.getAbsolutePath());
 		File[] files = Utils.ensureEmpty(outboxFolder.listFiles(fileFilter));
 		Arrays.sort(files);
-		LOG.debug("discovered files: " + Arrays.toString(files));
-		for (File file : files)
-			processFile(file);
+		LOG.debug("Discovered {} file(s)", files.length);
+		if (!Utils.isEmpty(files))
+			try {
+				processFiles(Arrays.asList(files));
+			} catch (IOException e) {
+				LOG.error(e.getMessage(), e);
+			}
 		return this;
 	}
 
-	public FolderMonitor monitorInbox() {
-		new Thread(this).start();
+	@Override
+	public FolderMonitor monitor() {
+		new Thread(this, FolderMonitor.class.getSimpleName()).start();
 		return this;
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
 	public void run() {
-		LOG.info("Start monitoring '" + outboxFolder.getAbsolutePath() + "'");
-		Path inboxPath = outboxFolder.toPath();
+		LOG.info("Start monitoring '{}' folder", outboxFolder.getAbsolutePath());
+		Path outboxPath = outboxFolder.toPath();
 		try {
-			inboxPath.register(watcher, ENTRY_CREATE);
-		} catch (IOException ex) {
-			LOG.error(ex.getMessage(), ex);
-			throw new IllegalStateException(ex);
+			outboxPath.register(watcher, ENTRY_CREATE);
+		} catch (IOException e) {
+			LOG.error(e.getMessage(), e);
+			throw new IllegalStateException(e);
 		}
 		while (true) {
 			WatchKey key;
 			try {
 				key = watcher.take();
-			} catch (InterruptedException ex) {
-				LOG.error(ex.getMessage(), ex);
-				throw new IllegalStateException(ex);
+			} catch (InterruptedException e) {
+				LOG.error(e.getMessage(), e);
+				throw new IllegalStateException(e);
 			}
-			LOG.info("'" + outboxFolder.getAbsolutePath() + "' content changed");
+			LOG.info("Folder '{}' content changed", outboxFolder.getAbsolutePath());
+			List<File> files = new ArrayList<>();
 			for (WatchEvent<?> event : key.pollEvents()) {
 				if (event.kind() == OVERFLOW) continue;
-				File patch = inboxPath.resolve(((WatchEvent<Path>) event).context()).toFile();
+				File patch = outboxPath.resolve(((WatchEvent<Path>) event).context()).toFile();
 				if (fileFilter.accept(patch))
-					try {
-						processFile(patch);
-					} catch (IOException ex) {
-						LOG.warn(ex.getMessage());
-					}
+					files.add(patch);
 			}
+			if (!files.isEmpty())
+				try {
+					processFiles(files);
+				} catch (IOException e) {
+					LOG.error(e.getMessage(), e);
+				}
 			boolean valid = key.reset();
 			if (!valid) {
-				LOG.error("Path '" + inboxPath + "' isn't valid anymore");
+				LOG.error("Path '{}' isn't valid anymore", outboxPath);
+				postMessage(new Main.StopMessage(
+						String.format("Please verify validity of folder '%s' and re-run application", outboxPath)));
 				break;
 			}
 		}

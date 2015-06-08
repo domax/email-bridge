@@ -18,8 +18,9 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
+		<!-- Effective working version is ews-java-api-2.0-20150605.103520-37.jar -->
 		<ews-java-api.version>2.0-SNAPSHOT</ews-java-api.version>
-		<jgit.version>4.0.0.201505050340-m2</jgit.version>
+		<!--<jgit.version>4.0.0.201505050340-m2</jgit.version>-->
 		<argparse4j.version>0.5.0</argparse4j.version>
 		<slf4j.version>1.7.12</slf4j.version>
 		<junit.version>4.12</junit.version>
@@ -59,11 +60,11 @@
 			<artifactId>ews-java-api</artifactId>
 			<version>${ews-java-api.version}</version>
 		</dependency>
-		<dependency>
-			<groupId>org.eclipse.jgit</groupId>
-			<artifactId>org.eclipse.jgit</artifactId>
-			<version>${jgit.version}</version>
-		</dependency>
+		<!--<dependency>-->
+			<!--<groupId>org.eclipse.jgit</groupId>-->
+			<!--<artifactId>org.eclipse.jgit</artifactId>-->
+			<!--<version>${jgit.version}</version>-->
+		<!--</dependency>-->
 		<dependency>
 			<groupId>net.sourceforge.argparse4j</groupId>
 			<artifactId>argparse4j</artifactId>
