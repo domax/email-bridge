@@ -24,6 +24,9 @@
 package org.mail.git;
 
 import microsoft.exchange.webservices.data.property.complex.ItemId;
+import net.sourceforge.argparse4j.ArgumentParsers;
+import net.sourceforge.argparse4j.inf.ArgumentParser;
+import net.sourceforge.argparse4j.inf.Namespace;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,7 +52,12 @@ public class Main implements Runnable {
 	private Message<?> message;
 
 	public static void main(String[] args) throws Exception {
-		final Config config = new Config(args[0]);
+		ArgumentParser parser = ArgumentParsers.newArgumentParser(Main.class.getSimpleName());
+		parser.addArgument("-f", "--config")
+				.required(true)
+				.help("path to file with configuration properties");
+		Namespace res = parser.parseArgsOrFail(args);
+		final Config config = new Config(res.getString("config"));
 		LOG.debug("Config settings: {}", config);
 		//TODO: add command line parsing to build config and printing usage help
 		new Main(config);

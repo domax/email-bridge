@@ -27,6 +27,7 @@
 	</properties>
 
 	<repositories>
+
 		<repository>
 			<id>sonatype-release</id>
 			<name>Sonatype Repository</name>
@@ -38,10 +39,12 @@
 				<enabled>true</enabled>
 			</snapshots>
 		</repository>
+
 		<repository>
 			<id>version99</id>
 			<url>http://version99.qos.ch/</url>
 		</repository>
+
 	</repositories>
 
 	<dependencyManagement>
@@ -53,6 +56,39 @@
 			</dependency>
 		</dependencies>
 	</dependencyManagement>
+
+	<build>
+
+		<plugins>
+
+			<plugin>
+				<artifactId>maven-assembly-plugin</artifactId>
+				<version>2.5.3</version>
+				<executions>
+					<execution>
+						<phase>package</phase>
+						<goals>
+							<goal>single</goal>
+						</goals>
+						<configuration>
+							<finalName>${project.artifactId}-${project.version}-standalone</finalName>
+							<appendAssemblyId>false</appendAssemblyId>
+							<archive>
+								<manifest>
+									<mainClass>org.mail.git.Main</mainClass>
+								</manifest>
+							</archive>
+							<descriptorRefs>
+								<descriptorRef>jar-with-dependencies</descriptorRef>
+							</descriptorRefs>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+
+		</plugins>
+
+	</build>
 
 	<dependencies>
 		<dependency>
