@@ -1,4 +1,4 @@
-git-exchange Project
+email-bridge Project
 ====================
 
 The main purpose of this project is to build more or less convenient data
@@ -28,7 +28,7 @@ initial conditions:
 The Overall Diagram
 -------------------
 
-![The Overall Diagram](./data/git-exchange.png "The Overall Diagram")
+![The Overall Diagram](./data/overall-diagram.png "The Overall Diagram")
 
 This application is designed to have at least 2 instances that are run on
 different computers. The typical and simplest case is just 2 computers 
@@ -77,7 +77,7 @@ following command:
 If build is successful, you can run the resulting JAR file as standalone Java
 app like that:
 
-    $ java -jar target/git-exchange-X.X.X-standalone.jar
+    $ java -jar target/email-bridge-X.X.X-standalone.jar
 
 Where `X.X.X` is current version number.
 
@@ -85,7 +85,13 @@ The invocation w/o arguments will show an error that proper configuration file
 is required. Just in case - you can get the short help about supported command
 line argument by specifying `-h` option:
 
-    $ java -jar target/git-exchange-X.X.X-standalone.jar -h
+    $ java -jar target/email-bridge-X.X.X-standalone.jar -h
+
+### Notices ###
+
+On some Windows hosts in case if application is ran from Cygwin it works but
+very slow - looks like there are some flaws in Cygwin Java threads management.  
+So, if you stuck with it - run application in `cmd.exe` tool instead.
 
 Usage
 -----
@@ -111,6 +117,19 @@ Usage
 ### Tune Logging ###
 
 [TBD]
+
+References
+----------
+
+1. [EWS Java API][ews-java-api]
+2. [Move objects and refs by archive][git-bundle]
+3. [Prepare patches for e-mail submission][git-format-patch]
+4. [Apply a series of patches from a mailbox][git-am]
+
+[ews-java-api]: https://github.com/OfficeDev/ews-java-api
+[git-bundle]: http://git-scm.com/docs/git-bundle
+[git-format-patch]: http://git-scm.com/docs/git-format-patch
+[git-am]: http://git-scm.com/docs/git-am
 
 TODO
 ----

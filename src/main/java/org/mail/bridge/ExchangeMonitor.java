@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package org.mail.git;
+package org.mail.bridge;
 
 import microsoft.exchange.webservices.data.autodiscover.IAutodiscoverRedirectionUrl;
 import microsoft.exchange.webservices.data.autodiscover.exception.AutodiscoverLocalException;
@@ -43,8 +43,8 @@ import microsoft.exchange.webservices.data.notification.*;
 import microsoft.exchange.webservices.data.property.complex.*;
 import microsoft.exchange.webservices.data.search.FindItemsResults;
 import microsoft.exchange.webservices.data.search.ItemView;
-import org.mail.git.util.EncryptUtil;
-import org.mail.git.util.Utils;
+import org.mail.bridge.util.EncryptUtil;
+import org.mail.bridge.util.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

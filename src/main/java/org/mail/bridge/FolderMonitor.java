@@ -21,9 +21,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package org.mail.git;
+package org.mail.bridge;
 
-import org.mail.git.util.Utils;
+import org.mail.bridge.util.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

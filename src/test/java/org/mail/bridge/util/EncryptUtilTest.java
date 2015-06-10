@@ -1,4 +1,4 @@
-package org.mail.git.util;
+package org.mail.bridge.util;
 
 import org.junit.Before;
 import org.junit.Test;

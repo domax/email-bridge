@@ -21,9 +21,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package org.mail.git;
+package org.mail.bridge;
 
-import org.mail.git.util.Utils;
+import org.mail.bridge.util.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -110,7 +110,7 @@ public class Config {
 		inboxFolder = s.isEmpty() ? System.getProperty("java.io.tmpdir") + File.separator + "inbox" : s;
 
 		s = config.getProperty("email.tag", "");
-		emailTag = s.isEmpty() ? "git-ews" : s;
+		emailTag = s.isEmpty() ? "email-bridge" : s;
 
 		s = config.getProperty("email.subject.format", "");
 		if (s.isEmpty()) mf = new MessageFormat(DEF_SUBJ);

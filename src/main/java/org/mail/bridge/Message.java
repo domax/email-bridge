@@ -21,42 +21,25 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package org.mail.git;
-
-import org.mail.git.util.Utils;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+package org.mail.bridge;
 
 /**
  * @author <a href="mailto:max@dominichenko.com">Maksym Dominichenko</a>
  */
-public abstract class AbstractMonitor {
+public class Message<T> {
 
-	private final Map<Class<? extends Message<?>>, List<MonitorCallback<?>>> callbacks = new HashMap<>();
+	private final T data;
 
-	protected <T> AbstractMonitor addCallback(Class<? extends Message<T>> messageClass, MonitorCallback<T> callback) {
-		if (callback != null) {
-			List<MonitorCallback<?>> callbackList = callbacks.get(messageClass);
-			if (callbackList == null) {
-				callbackList = new ArrayList<>();
-				callbacks.put(messageClass, callbackList);
-			}
-			callbackList.add(callback);
-		}
-		return this;
+	public Message(T data) {
+		this.data = data;
 	}
 
-	@SuppressWarnings({"unchecked", "SuspiciousMethodCalls"})
-	protected <T> void postMessage(Message<T> message) {
-		List callbackList = Utils.ensureEmpty(callbacks.get(message.getClass()));
-		for (MonitorCallback<T> callback : (List<MonitorCallback<T>>) callbackList)
-			callback.onMessage(message);
+	public T getData() {
+		return data;
 	}
 
-	public abstract AbstractMonitor scan();
-
-	public abstract AbstractMonitor monitor();
+	@Override
+	public String toString() {
+		return "Message {" + "data=" + data + '}';
+	}
 }

@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package org.mail.git;
+package org.mail.bridge;
 
 /**
  * @author <a href="mailto:max@dominichenko.com">Maksym Dominichenko</a>
