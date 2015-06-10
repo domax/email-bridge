@@ -42,6 +42,7 @@ import static java.nio.file.StandardWatchEventKinds.OVERFLOW;
 public class FolderMonitor extends AbstractMonitor implements Runnable {
 
 	private static final Logger LOG = LoggerFactory.getLogger(FolderMonitor.class);
+	private static final long NEW_FILES_PROCESS_DELAY = 1000;
 
 	public static class SendFileMessage extends Message<List<File>> {
 		public SendFileMessage(List<File> data) {
@@ -49,9 +50,26 @@ public class FolderMonitor extends AbstractMonitor implements Runnable {
 		}
 	}
 
+	private class ProcessFilesTimerTask extends TimerTask {
+		@SuppressWarnings("unchecked")
+		@Override
+		public void run() {
+			timer.cancel();
+			timer = null;
+			try {
+				processFiles((List<File>) files.clone());
+			} catch (IOException e) {
+				LOG.error(e.getMessage(), e);
+			}
+			files.clear();
+		}
+	}
+
 	private final Config config;
 	private final File outboxFolder;
 	private final WatchService watcher;
+	private final ArrayList<File> files = new ArrayList<>();
+	private Timer timer;
 
 	private final FileFilter fileFilter = new FileFilter() {
 		@Override
@@ -130,20 +148,22 @@ public class FolderMonitor extends AbstractMonitor implements Runnable {
 				LOG.error(e.getMessage(), e);
 				throw new IllegalStateException(e);
 			}
+			if (timer != null) {
+				timer.cancel();
+				timer = null;
+			}
 			LOG.info("Folder '{}' content changed", outboxFolder.getAbsolutePath());
-			List<File> files = new ArrayList<>();
 			for (WatchEvent<?> event : key.pollEvents()) {
 				if (event.kind() == OVERFLOW) continue;
 				File patch = outboxPath.resolve(((WatchEvent<Path>) event).context()).toFile();
 				if (fileFilter.accept(patch))
 					files.add(patch);
 			}
-			if (!files.isEmpty())
-				try {
-					processFiles(files);
-				} catch (IOException e) {
-					LOG.error(e.getMessage(), e);
-				}
+			if (!files.isEmpty()) {
+				timer = new Timer();
+				timer.schedule(new ProcessFilesTimerTask(), NEW_FILES_PROCESS_DELAY);
+				LOG.debug("File processing timer is (re-)scheduled");
+			}
 			boolean valid = key.reset();
 			if (!valid) {
 				LOG.error("Path '{}' isn't valid anymore", outboxPath);

@@ -33,6 +33,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.ConcurrentLinkedDeque;
 
 /**
  * @author <a href="mailto:max@dominichenko.com">Maksym Dominichenko</a>
@@ -49,7 +50,7 @@ public class Main implements Runnable {
 
 	private final FolderMonitor folderMonitor;
 	private final ExchangeMonitor exchangeMonitor;
-	private Message<?> message;
+	private final ConcurrentLinkedDeque<Message<?>> messages = new ConcurrentLinkedDeque<>();
 
 	public static void main(String[] args) throws Exception {
 		ArgumentParser parser = ArgumentParsers.newArgumentParser(Main.class.getSimpleName());
@@ -100,7 +101,7 @@ public class Main implements Runnable {
 	}
 
 	private synchronized void postMessage(Message<?> message) {
-		this.message = message;
+		messages.addLast(message);
 	}
 
 	@Override
@@ -109,7 +110,8 @@ public class Main implements Runnable {
 		folderMonitor.scan().monitor();
 		while (true) {
 			try {
-				if (message != null) {
+				while (!messages.isEmpty()) {
+					Message<?> message = messages.removeFirst();
 					LOG.debug("Message received: {}", message);
 					if (message instanceof ExchangeMonitor.NewMailMessage)
 						exchangeMonitor.processNewMail(((ExchangeMonitor.NewMailMessage) message).getData());
@@ -121,7 +123,7 @@ public class Main implements Runnable {
 						System.out.println(((StopMessage) message).getData());
 						break;
 					}
-					message = null;
+					Thread.sleep(10);
 				}
 				Thread.sleep(1000);
 			} catch (InterruptedException e) {
