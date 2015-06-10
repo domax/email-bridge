@@ -6,11 +6,12 @@
 
 	<groupId>org.exchange.git</groupId>
 	<artifactId>email-bridge</artifactId>
-	<version>0.0.1</version>
+	<version>0.0.2</version>
 	<packaging>jar</packaging>
 
 	<name>email-bridge</name>
-	<url>http://maven.apache.org</url>
+	<description>Data bridge between dedicated folders on 2 computers via Email</description>
+	<url>https://github.com/domax/email-bridge</url>
 
 	<properties>
 		<maven.compiler.source>1.7</maven.compiler.source>

@@ -98,13 +98,83 @@ Usage
 
 ### Configuration file ###
 
-#### Each side uses its own EWS server
+The application requires a valid configuration file for run.
 
-[TBD]
+This configuration file is simple key-value properties enclosed into text file.
+The self-explained configuration file template 
+[`config-template.properties`](data/config-template.properties) you may find in
+`data` folder.
+
+#### EWS Settings
+
+First of all you have to define the credentials for your Exchange server.
+At least `ews.email`, `ews.username` and `ews.password` should be defined.
+Also `ews.server` is recommended to define, because otherwise auto-discovery
+functionality will be engaged that will slow a lot the connection phase. 
+
+Very often `ews.username` is the same as `ews.email`, so if you aren't sure
+what is your username, just put your email address here.
+
+The `ews.domain` property should be specified only in case if it wasn't 
+auto-detected by application and issued exception explicitly requires it. 
+
+#### Test bridge on one node
+
+This test is recommended to perform when you define settings for node. This
+will help you to make sure that your node is fully functioning and ready to
+exchange data with remote side.
+
+1. First of all, set `email.tag.incoming` and `email.tag.outgoing` properties
+   to the same value.
+2. Then copy `ews.email` address to `email.recipients.to`.
+
+That's it. Now your node will send files via your exchange server to itself.
+So that when you start app, and drop files into folder that you defined in
+`outbox.folder` property, after some time you will get then in folder defined
+in `inbox.folder`.
+
+If you have it, move forward and decide what mode of file exchange is most
+appropriate for you:
+
+* If you have access to the same EWS server from both nodes, use **"Both sides
+  use the same EWS server"** mode. That will speedup file delivery because
+  server will know about new email instantly, w/o intermediate email routing.
+* In case if your nodes have access to different EWS servers, the **"Each side
+  uses its own EWS server"** is your choice.
 
 #### Both sides use the same EWS server
 
-[TBD]
+Both sides (nodes) should use the same configuration file, except following.
+
+The `email.tag.incoming` and `email.tag.outgoing` properties should be
+different. So that if e.g. **side 1** has properties:
+   
+    email.tag.incoming = git-ews-forth
+    email.tag.outgoing = git-ews-back
+     
+then **side 2** should have these properties as
+
+    email.tag.incoming = git-ews-back
+    email.tag.outgoing = git-ews-forth
+
+And, of course, `ews.email` and `email.recipients.to` properties on these nodes
+should be "crossed":
+
+e.g. if **side 1**:
+
+    ews.email = user1@side1.example.com
+    email.recipients.to = user2@side2.example.com
+
+then **side 2**:
+
+    ews.email = user2@side2.example.com
+    email.recipients.to = user1@side1.example.com
+
+#### Each side uses its own EWS server
+
+Each side should have its own set of `ews.*` properties and probably `proxy.*`
+ones. Rest of properties should be the same, except `ews.email` and
+`email.recipients.to` - they should be "crossed" as described above.
 
 ### Git Email Mode ###
 
@@ -135,8 +205,6 @@ TODO
 ----
 
 0. Fix bug when several emails are processed at once.
-0. Split tags for incoming and outgoing email messages - to use EWS server
-   on both (several) sides.
 0. Add possibility to limit Email size and splitting it to several parts.
 0. Add possibility to invoke scripts as new email post-process action.
 0. Setup ESW folder for data exchange, extend Config accordingly.

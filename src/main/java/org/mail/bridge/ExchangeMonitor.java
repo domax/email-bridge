@@ -188,7 +188,7 @@ public class ExchangeMonitor extends AbstractMonitor implements
 	private boolean isSubjectMatched(String subject) {
 		try {
 			Object[] params = config.getEmailSubjectFormat().parse(subject);
-			if (!Utils.isEmpty(params) && config.getEmailTag().equals(params[0])) {
+			if (!Utils.isEmpty(params) && config.getEmailTagIncoming().equals(params[0])) {
 				LOG.debug("Subject '{}' is matched for processing", subject);
 				return true;
 			} else LOG.debug("Subject '{}' doesn't match to email tag", subject);
@@ -275,7 +275,7 @@ public class ExchangeMonitor extends AbstractMonitor implements
 			final StringBuilder subjectBuilder = new StringBuilder();
 			final Map<File, InputStream> attachmentStreams = new HashMap<>();
 			for (File file : files) {
-				final Object[] params = {config.getEmailTag(), new Date(), file.getName()};
+				final Object[] params = {config.getEmailTagOutgoing(), new Date(), file.getName()};
 				subjectBuilder.append(config.getEmailSubjectFormat().format(params)).append(" ");
 				bodyBuilder.append(config.getEmailBodyFormat().format(params)).append("\n");
 				attachmentStreams.put(file, addFileAttachment(msg.getAttachments(), file));

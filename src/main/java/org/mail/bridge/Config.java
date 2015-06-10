@@ -63,7 +63,8 @@ public class Config {
 	private final String outboxFileRegexp;
 	private final String inboxFolder;
 
-	private final String emailTag;
+	private final String emailTagIncoming;
+	private final String emailTagOutgoing;
 	private final MessageFormat emailSubjectFormat;
 	private final MessageFormat emailBodyFormat;
 	private final String[] emailRecipientsTo;
@@ -109,8 +110,10 @@ public class Config {
 		s = config.getProperty("inbox.folder", "");
 		inboxFolder = s.isEmpty() ? System.getProperty("java.io.tmpdir") + File.separator + "inbox" : s;
 
-		s = config.getProperty("email.tag", "");
-		emailTag = s.isEmpty() ? "email-bridge" : s;
+		s = config.getProperty("email.tag.incoming", "");
+		emailTagIncoming = s.isEmpty() ? "email-bridge" : s;
+		s = config.getProperty("email.tag.outgoing", "");
+		emailTagOutgoing = s.isEmpty() ? "email-bridge" : s;
 
 		s = config.getProperty("email.subject.format", "");
 		if (s.isEmpty()) mf = new MessageFormat(DEF_SUBJ);
@@ -220,8 +223,12 @@ public class Config {
 		return emailInboxCleanup;
 	}
 
-	public String getEmailTag() {
-		return emailTag;
+	public String getEmailTagIncoming() {
+		return emailTagIncoming;
+	}
+
+	public String getEmailTagOutgoing() {
+		return emailTagOutgoing;
 	}
 
 	public MessageFormat getEmailSubjectFormat() {
@@ -279,7 +286,8 @@ public class Config {
 				",\n\toutboxCleanup=" + outboxCleanup +
 				",\n\toutboxFileRegexp='" + outboxFileRegexp + '\'' +
 				",\n\tinboxFolder='" + inboxFolder + '\'' +
-				",\n\temailTag='" + emailTag + '\'' +
+				",\n\temailTagIncoming='" + emailTagIncoming + '\'' +
+				",\n\temailTagOutgoing='" + emailTagOutgoing + '\'' +
 				",\n\temailSubjectFormat='" + emailSubjectFormat.toPattern() + '\'' +
 				",\n\temailBodyFormat='" + emailBodyFormat.toPattern() + '\'' +
 				",\n\temailInboxCleanup=" + emailInboxCleanup +
