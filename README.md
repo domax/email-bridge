@@ -130,13 +130,13 @@ exchange data with remote side.
 
 That's it. Now your node will send files via your exchange server to itself.
 So that when you start app, and drop files into folder that you defined in
-`outbox.folder` property, after some time you will get then in folder defined
+`outbox.folder` property, after some time you will get them in folder defined
 in `inbox.folder`.
 
 If you have it, move forward and decide what mode of file exchange is most
 appropriate for you:
 
-* If you have access to the same EWS server from both nodes, use **"Both sides
+* If you have access to the same EWS server from both sides, use **"Both sides
   use the same EWS server"** mode. That will speedup file delivery because
   server will know about new email instantly, w/o intermediate email routing.
 * In case if your nodes have access to different EWS servers, the **"Each side
@@ -156,6 +156,9 @@ then **side 2** should have these properties as
 
     email.tag.incoming = git-ews-back
     email.tag.outgoing = git-ews-forth
+
+That separates 2 head email streams on one server and allows each node to deal
+with its own email stream independently.
 
 And, of course, `ews.email` and `email.recipients.to` properties on these nodes
 should be "crossed":
