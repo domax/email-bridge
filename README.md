@@ -17,6 +17,8 @@ initial conditions:
 
 * Both sides use MS Exchange (EWS) server as Email transport. It means that
   both sides may use either the same EWS server or different ones, but EWS.
+  Although application design allows implementing other mail systems - IMAP,
+  POP3 or smth else, where user may upload/attach and download/get files.
 * EWS on both computers allows attachments but scans them and cut them off in
   case if they contain "prohibited" media content, though this filter allows
   non-detectable (encrypted) attachments.
@@ -213,7 +215,7 @@ Below are most typical cases you may deal with.
 
 #### Case 1. Existing repo on Side 1 and new empty repo on Side 2.
 
-It is initial phase of data exchange. You have do have the following:
+It is initial phase of data exchange. You have to have the following:
 
 1. Existing Git repo on Side 1, where you have some commits already. It's not
    important whether your repo has remote origin or not.
@@ -317,6 +319,8 @@ go to the Side 2 host.
 
     $ # Remove imported bundle
     $ rm $EMAIL_BRIDGE_INBOX/email-bridge-<40_hex_digits_git_hash>.bundle
+
+Now you can do `git push` if your repo has remote origin defined.
 
 ### Tune Logging ###
 
