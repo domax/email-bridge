@@ -60,7 +60,6 @@ public class Main implements Runnable {
 		Namespace res = parser.parseArgsOrFail(args);
 		final Config config = new Config(res.getString("config"));
 		LOG.debug("Config settings: {}", config);
-		//TODO: add command line parsing to build config and printing usage help
 		new Main(config);
 	}
 

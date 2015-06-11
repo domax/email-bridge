@@ -25,6 +25,21 @@ initial conditions:
   temporarily keep VCS (Git) patches or bundles that in fact is plain list, so
   that any kind of file hierarchy support is business of VCS.
 
+How It Works In A Nutshell
+--------------------------
+
+When application runs, first of all it scans your EWS inbox
+for transport email, matching subject to specific pattern and, if such emails
+found, extracts files from their attachments. Then is waits for new messages
+and does the same for all new matched emails. All transport emails are removed
+automatically.
+
+Just after email Inbox was scanned, application scans its "outbox" folder. If
+there are files which names are matched to specific regexp pattern, these files
+are gathered as attachments into new email message, and this email message is
+sent away with specific subject. Then application waits for new files in
+"outbox" folder and does the same for all new files there.
+
 The Overall Diagram
 -------------------
 
@@ -54,7 +69,7 @@ So the main flow may look like that:
 The last point may be automated as well - this feature is in TODO list (look at
 the bottom of this README).
 
-Build and Run
+Build And Run
 -------------
 
 ### Prerequisites ###
@@ -103,7 +118,9 @@ The application requires a valid configuration file for run.
 This configuration file is simple key-value properties enclosed into text file.
 The self-explained configuration file template 
 [`config-template.properties`](data/config-template.properties) you may find in
-`data` folder.
+`data` folder. So the usual command to run app should look like that:
+ 
+    $ java -jar target/email-bridge-X.X.X-standalone.jar -f config.properties
 
 #### EWS Settings
 
@@ -147,12 +164,12 @@ appropriate for you:
 Both sides (nodes) should use the same configuration file, except following.
 
 The `email.tag.incoming` and `email.tag.outgoing` properties should be
-different. So that if e.g. **side 1** has properties:
+different. So that if e.g. **Side 1** has properties:
    
     email.tag.incoming = git-ews-forth
     email.tag.outgoing = git-ews-back
      
-then **side 2** should have these properties as
+then **Side 2** should have these properties as
 
     email.tag.incoming = git-ews-back
     email.tag.outgoing = git-ews-forth
@@ -163,12 +180,12 @@ with its own email stream independently.
 And, of course, `ews.email` and `email.recipients.to` properties on these nodes
 should be "crossed":
 
-e.g. if **side 1**:
+e.g. if **Side 1**:
 
     ews.email = user1@side1.example.com
     email.recipients.to = user2@side2.example.com
 
-then **side 2**:
+then **Side 2**:
 
     ews.email = user2@side2.example.com
     email.recipients.to = user1@side1.example.com
@@ -185,7 +202,121 @@ ones. Rest of properties should be the same, except `ews.email` and
 
 ### Git Bundle Mode ###
 
-[TBD]
+This mode is about using [git-bundle] command.
+
+In case if you select to use Git bundles to transfer changes from one side to
+another you may turn off the application attachment zipping feature, because
+Git bundles are packed already. Just specify `email.attach.gzip = false` in
+your configuration file. Though, if you don't - it will work w/o problems.
+
+Below are most typical cases you may deal with.
+
+#### Case 1. Existing repo on Side 1 and new empty repo on Side 2.
+
+It is initial phase of data exchange. You have do have the following:
+
+1. Existing Git repo on Side 1, where you have some commits already. It's not
+   important whether your repo has remote origin or not.
+2. Empty (or non-empty - then conflict resolving is possible) Git repo on
+   Side 2. Remote origin isn't important here as well.
+
+**Side 1:**
+
+    $ # Go to the Git-driven project folder
+    $ cd email-bridge
+    
+    $ # Create the full project bundle from master branch
+    $ # and drop it into outbox folder of your email-bridge app
+    $ # File name will be in form email-bridge-<40_hex_digits_git_hash>.bundle
+    $ git bundle create "$EMAIL_BRIDGE_OUTBOX/email-bridge-`git rev-parse HEAD`.bundle" master
+    
+    $ # Tag the current state of your Git repo to simplify
+    $ # the further incremental bundle changes gathering.
+    $ # Use tag name you like.
+    $ git tag -f git-email-bridge 
+
+After some time, when email-bridge transferred bundle from Side 1 to Side 2,
+go to the Side 2 host.
+
+**Side 2:**
+
+    $ # Go to the Git-driven project folder
+    $ cd email-bridge
+    
+    $ # Load received bundle content into FETCH_HEAD branch
+    $ git fetch $EMAIL_BRIDGE_INBOX/email-bridge-<40_hex_digits_git_hash>.bundle master
+    
+    $ # Merge FETCH_HEAD into current branch
+    $ git merge FETCH_HEAD
+    
+    $ # Tag the current state of your Git repo to simplify
+    $ # the further incremental bundle changes gathering.
+    $ # Use tag name you like.
+    $ git tag -f git-email-bridge 
+
+    $ # Remove imported bundle
+    $ rm $EMAIL_BRIDGE_INBOX/email-bridge-<40_hex_digits_git_hash>.bundle
+
+Now you can do `git push` if your repo has remote origin defined.
+
+Sometimes new empty Git repo is created with initial commit, that provokes
+the merge commit. This commit should be returned to source repository.
+If you stuck with it, then simple send this commit back to the source side (to
+Side 1 in our example). Short command set for that:
+
+**Side 2:**
+
+    $ git bundle create "$EMAIL_BRIDGE_OUTBOX/email-bridge-`git rev-parse HEAD`.bundle" HEAD^..master
+
+**Side 1:**
+
+    $ git fetch $EMAIL_BRIDGE_INBOX/email-bridge-<40_hex_digits_git_hash>.bundle master
+    $ git merge FETCH_HEAD
+    $ git tag -f git-email-bridge 
+    $ rm $EMAIL_BRIDGE_INBOX/email-bridge-<40_hex_digits_git_hash>.bundle
+
+#### Case 2. Changes are committed on Side 1, need to be pushed to Side 2.
+
+This is typical iterated phase when you did part of work and want to transfer
+your changes to remote side.
+The set of commands is completely the same for both directions, so lets suppose
+your changes should be transferred from Side 1 repo to Side 2 one.
+
+**Side 1:**
+
+    $ # Go to the Git-driven project folder
+    $ cd email-bridge
+
+    $ # Create the incremental bundle from master branch
+    $ # and drop it into outbox folder of your email-bridge app
+    $ git bundle create "$EMAIL_BRIDGE_OUTBOX/email-bridge-`git rev-parse HEAD`.bundle" git-email-bridge..master
+    
+    $ # Move tag to the current state of your Git repo
+    $ # for further incremental bundle changes gathering.
+    $ # Use tag name you used before.
+    $ git tag -f git-email-bridge 
+
+After some time, when email-bridge transferred bundle from Side 1 to Side 2,
+go to the Side 2 host.
+
+**Side 2:**
+
+    $ # Go to the Git-driven project folder
+    $ cd email-bridge
+    
+    $ # Load received bundle content into FETCH_HEAD branch
+    $ git fetch $EMAIL_BRIDGE_INBOX/email-bridge-<40_hex_digits_git_hash>.bundle master
+    
+    $ # Merge FETCH_HEAD into current branch
+    $ git merge FETCH_HEAD
+    
+    $ # Tag the current state of your Git repo
+    $ # for further incremental bundle changes gathering.
+    $ # Use tag name you used before.
+    $ git tag -f git-email-bridge 
+
+    $ # Remove imported bundle
+    $ rm $EMAIL_BRIDGE_INBOX/email-bridge-<40_hex_digits_git_hash>.bundle
 
 ### Tune Logging ###
 
@@ -210,6 +341,7 @@ TODO
 0. Fix bug when several emails are processed at once.
 0. Add possibility to limit Email size and splitting it to several parts.
 0. Add possibility to invoke scripts as new email post-process action.
+0. Add setting to delete emails into Trash folder instead of hard remove.
 0. Setup ESW folder for data exchange, extend Config accordingly.
 0. Include daemonizing feature - to allow user start, stop and check status of
    service w/o additional complex scripts.
