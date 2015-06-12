@@ -331,10 +331,10 @@ Path to such script file (or any other executable) should be specified in
 `inbox.script` configuration property.   
 Positional arguments of this script are received file names (w/o paths) in
 order they were received and extracted from email attachments.
-Environment variables are system ones plus values from this config file, which
-names are property names that are upper-cased and dot-to-underscore replaced,
-so that e.g. property with name "inbox.script" will be represented as
-environment variable with name "INBOX_SCRIPT".
+Environment variables are system ones plus values from configuration file,
+which names are property names that are upper-cased and dot-to-underscore
+replaced, so that e.g. property with name `inbox.script` will be represented as
+environment variable with name `INBOX_SCRIPT`.
 
 You can find demo script [`inbox-demo.sh`](data/inbox-demo.sh) in `data`
 folder. This script does nothing, just prints some info into application log.

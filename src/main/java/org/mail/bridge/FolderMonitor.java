@@ -83,6 +83,12 @@ public class FolderMonitor extends AbstractMonitor implements Runnable {
 					&& (config.getOutboxFileRegexp().isEmpty() || file.getName().matches(config.getOutboxFileRegexp()));
 		}
 	};
+	private final Comparator<File> outboxFileComparator = new Comparator<File>() {
+		@Override
+		public int compare(File o1, File o2) {
+			return (int) (o1.lastModified() - o2.lastModified());
+		}
+	};
 
 	public FolderMonitor(Config config) throws IOException {
 		this.config = config;
@@ -115,23 +121,22 @@ public class FolderMonitor extends AbstractMonitor implements Runnable {
 	public synchronized void runScriptAgainstReceivedFiles(List<File> inboxFiles) {
 		if (config.getInboxScript().isEmpty() || Utils.isEmpty(inboxFiles)) return;
 		LOG.debug("Run script '{}' against files '{}'", config.getInboxScript(), inboxFiles);
+		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		try {
 			CommandLine cmd = CommandLine.parse(config.getInboxScript());
 			for (File file : inboxFiles)
 				cmd.addArgument(file.getName(), true);
 			DefaultExecutor executor = new DefaultExecutor();
-			ByteArrayOutputStream out = new ByteArrayOutputStream();
 			executor.setStreamHandler(new PumpStreamHandler(out));
 			executor.setWatchdog(new ExecuteWatchdog(SCRIPT_TIMEOUT));
 			Map<String, String> environment = EnvironmentUtils.getProcEnvironment();
 			environment.putAll(config.asEnvironmentMap());
-			int exit = executor.execute(cmd, environment);
-			LOG.info("Script {} finished with code {}", config.getInboxScript(), exit);
-			String outMessage = "Script output:\n" + out.toString();
-			if (exit == 0) LOG.debug(outMessage);
-			else LOG.warn(outMessage);
+			executor.execute(cmd, environment);
+			LOG.info("Script {} successfully finished", config.getInboxScript());
+			LOG.debug("Script output:\n{}", out.toString());
 		} catch (IOException e) {
 			LOG.error(e.getMessage(), e);
+			LOG.error("\nScript '{}' output:\n{}", config.getInboxScript(), out.toString());
 		}
 	}
 
@@ -139,7 +144,7 @@ public class FolderMonitor extends AbstractMonitor implements Runnable {
 	public synchronized FolderMonitor scan() {
 		LOG.info("Start scanning '{}' folder", outboxFolder.getAbsolutePath());
 		File[] files = Utils.ensureEmpty(outboxFolder.listFiles(fileFilter));
-		Arrays.sort(files);
+		Arrays.sort(files, outboxFileComparator);
 		LOG.debug("Discovered {} file(s)", files.length);
 		if (!Utils.isEmpty(files))
 			try {
