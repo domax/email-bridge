@@ -90,7 +90,13 @@ public class Main implements Runnable {
 						postMessage(message);
 					}
 				})
-				.addReopenCallback(new MonitorCallback<Void>() {
+				.addIncomingFilesReadyCallback(new MonitorCallback<List<File>>() {
+					@Override
+					public void onMessage(Message<List<File>> message) {
+						postMessage(message);
+					}
+				})
+				.addReopenMonitorCallback(new MonitorCallback<Void>() {
 					@Override
 					public void onMessage(Message<Void> message) {
 						postMessage(message);
@@ -114,6 +120,8 @@ public class Main implements Runnable {
 					LOG.debug("Message received: {}", message);
 					if (message instanceof ExchangeMonitor.NewMailMessage)
 						exchangeMonitor.processNewMail(((ExchangeMonitor.NewMailMessage) message).getData());
+					else if (message instanceof ExchangeMonitor.NewIncomingFilesMessage)
+						folderMonitor.runScriptAgainstReceivedFiles(((ExchangeMonitor.NewIncomingFilesMessage) message).getData());
 					else if (message instanceof ExchangeMonitor.ReopenMonitorMessage)
 						exchangeMonitor.scan().monitor();
 					else if (message instanceof FolderMonitor.SendFileMessage)
@@ -121,7 +129,7 @@ public class Main implements Runnable {
 					else if (message instanceof StopMessage) {
 						System.out.println(((StopMessage) message).getData());
 						break;
-					}
+					} else LOG.warn("Unsupported message {}", message);
 					Thread.sleep(10);
 				}
 				Thread.sleep(1000);

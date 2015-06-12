@@ -32,6 +32,8 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 
 /**
@@ -61,7 +63,9 @@ public class Config {
 	private final String outboxFolder;
 	private final boolean outboxCleanup;
 	private final String outboxFileRegexp;
+
 	private final String inboxFolder;
+	private final String inboxScript;
 
 	private final String emailTagIncoming;
 	private final String emailTagOutgoing;
@@ -107,8 +111,10 @@ public class Config {
 		s = config.getProperty("outbox.cleanup", "");
 		outboxCleanup = s.isEmpty() || Boolean.parseBoolean(s);
 		outboxFileRegexp = config.getProperty("outbox.file.regexp", "");
+
 		s = config.getProperty("inbox.folder", "");
 		inboxFolder = s.isEmpty() ? System.getProperty("java.io.tmpdir") + File.separator + "inbox" : s;
+		inboxScript = config.getProperty("inbox.script", "");
 
 		s = config.getProperty("email.tag.incoming", "");
 		emailTagIncoming = s.isEmpty() ? "email-bridge" : s;
@@ -219,6 +225,10 @@ public class Config {
 		return inboxFolder;
 	}
 
+	public String getInboxScript() {
+		return inboxScript;
+	}
+
 	public boolean isEmailInboxCleanup() {
 		return emailInboxCleanup;
 	}
@@ -267,6 +277,40 @@ public class Config {
 		return emailAttachExtEnc;
 	}
 
+	public Map<String, String> asEnvironmentMap() {
+		Map<String, String> result = new HashMap<>();
+		result.put("EWS_EMAIL", ewsEmail);
+		result.put("EWS_DOMAIN", ewsDomain);
+		result.put("EWS_USERNAME", ewsUsername);
+		result.put("EWS_PASSWORD", ewsPassword);
+		result.put("EWS_SERVER", ewsServer);
+		result.put("EWS_VIEW_SIZE", "" + ewsViewSize);
+		result.put("EWS_SUBSCRIPTION_LIFETIME", "" + ewsSubscriptionLifetime);
+		result.put("PROXY_HOST", proxyHost);
+		result.put("PROXY_PORT", "" + proxyPort);
+		result.put("PROXY_USERNAME", proxyUsername);
+		result.put("PROXY_PASSWORD", proxyPassword);
+		result.put("PROXY_DOMAIN", proxyDomain);
+		result.put("OUTBOX_FOLDER", outboxFolder);
+		result.put("OUTBOX_CLEANUP", "" + outboxCleanup);
+		result.put("OUTBOX_FILE_REGEXP", outboxFileRegexp);
+		result.put("INBOX_FOLDER", inboxFolder);
+		result.put("INBOX_SCRIPT", inboxScript);
+		result.put("EMAIL_TAG_INCOMING", emailTagIncoming);
+		result.put("EMAIL_TAG_OUTGOING", emailTagOutgoing);
+		result.put("EMAIL_SUBJECT_FORMAT", emailSubjectFormat.toPattern());
+		result.put("EMAIL_BODY_FORMAT", emailBodyFormat.toPattern());
+		result.put("EMAIL_INBOX_CLEANUP", "" + emailInboxCleanup);
+		result.put("EMAIL_RECIPIENTS_TO", Utils.join(",", emailRecipientsTo));
+		result.put("EMAIL_RECIPIENTS_CC", Utils.join(",", emailRecipientsCc));
+		result.put("EMAIL_RECIPIENTS_BCC", Utils.join(",", emailRecipientsBcc));
+		result.put("EMAIL_ATTACH_PASSWORD", emailAttachPassword);
+		result.put("EMAIL_ATTACH_GZIP", "" + emailAttachGzip);
+		result.put("EMAIL_ATTACH_EXT_GZIP", emailAttachExtGzip);
+		result.put("EMAIL_ATTACH_EXT_ENC", emailAttachExtEnc);
+		return result;
+	}
+
 	@Override
 	public String toString() {
 		return "Config {" +
@@ -286,6 +330,7 @@ public class Config {
 				",\n\toutboxCleanup=" + outboxCleanup +
 				",\n\toutboxFileRegexp='" + outboxFileRegexp + '\'' +
 				",\n\tinboxFolder='" + inboxFolder + '\'' +
+				",\n\tinboxScript='" + inboxScript + '\'' +
 				",\n\temailTagIncoming='" + emailTagIncoming + '\'' +
 				",\n\temailTagOutgoing='" + emailTagOutgoing + '\'' +
 				",\n\temailSubjectFormat='" + emailSubjectFormat.toPattern() + '\'' +

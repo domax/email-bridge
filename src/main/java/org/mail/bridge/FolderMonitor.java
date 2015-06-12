@@ -23,10 +23,13 @@
  */
 package org.mail.bridge;
 
+import org.apache.commons.exec.*;
+import org.apache.commons.exec.environment.EnvironmentUtils;
 import org.mail.bridge.util.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
@@ -43,6 +46,7 @@ public class FolderMonitor extends AbstractMonitor implements Runnable {
 
 	private static final Logger LOG = LoggerFactory.getLogger(FolderMonitor.class);
 	private static final long NEW_FILES_PROCESS_DELAY = 1000;
+	private static final int SCRIPT_TIMEOUT = 60000;
 
 	public static class SendFileMessage extends Message<List<File>> {
 		public SendFileMessage(List<File> data) {
@@ -106,6 +110,29 @@ public class FolderMonitor extends AbstractMonitor implements Runnable {
 		LOG.debug("Process files '{}'", files);
 		if (Utils.isEmpty(files)) return;
 		postMessage(new SendFileMessage(files));
+	}
+
+	public synchronized void runScriptAgainstReceivedFiles(List<File> inboxFiles) {
+		if (config.getInboxScript().isEmpty() || Utils.isEmpty(inboxFiles)) return;
+		LOG.debug("Run script '{}' against files '{}'", config.getInboxScript(), inboxFiles);
+		try {
+			CommandLine cmd = CommandLine.parse(config.getInboxScript());
+			for (File file : inboxFiles)
+				cmd.addArgument(file.getName(), true);
+			DefaultExecutor executor = new DefaultExecutor();
+			ByteArrayOutputStream out = new ByteArrayOutputStream();
+			executor.setStreamHandler(new PumpStreamHandler(out));
+			executor.setWatchdog(new ExecuteWatchdog(SCRIPT_TIMEOUT));
+			Map<String, String> environment = EnvironmentUtils.getProcEnvironment();
+			environment.putAll(config.asEnvironmentMap());
+			int exit = executor.execute(cmd, environment);
+			LOG.info("Script {} finished with code {}", config.getInboxScript(), exit);
+			String outMessage = "Script output:\n" + out.toString();
+			if (exit == 0) LOG.debug(outMessage);
+			else LOG.warn(outMessage);
+		} catch (IOException e) {
+			LOG.error(e.getMessage(), e);
+		}
 	}
 
 	@Override

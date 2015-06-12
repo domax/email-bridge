@@ -63,14 +63,20 @@ public class ExchangeMonitor extends AbstractMonitor implements
 	private static final Logger LOG = LoggerFactory.getLogger(ExchangeMonitor.class);
 
 	public static class NewMailMessage extends Message<List<ItemId>> {
-		public NewMailMessage(List<ItemId> data) {
-			super(data);
+		public NewMailMessage(List<ItemId> emails) {
+			super(emails);
 		}
 	}
 
 	public static class ReopenMonitorMessage extends Message<Void> {
 		public ReopenMonitorMessage() {
 			super(null);
+		}
+	}
+
+	public static class NewIncomingFilesMessage extends Message<List<File>> {
+		public NewIncomingFilesMessage(List<File> files) {
+			super(files);
 		}
 	}
 
@@ -118,18 +124,23 @@ public class ExchangeMonitor extends AbstractMonitor implements
 		return (ExchangeMonitor) addCallback(NewMailMessage.class, callback);
 	}
 
-	public ExchangeMonitor addReopenCallback(MonitorCallback<Void> callback) {
+	public ExchangeMonitor addReopenMonitorCallback(MonitorCallback<Void> callback) {
 		return (ExchangeMonitor) addCallback(ReopenMonitorMessage.class, callback);
 	}
 
-	private void processEmail(EmailMessage emailMessage) {
+	public ExchangeMonitor addIncomingFilesReadyCallback(MonitorCallback<List<File>> callback) {
+		return (ExchangeMonitor) addCallback(NewIncomingFilesMessage.class, callback);
+	}
+
+	private List<File> processEmail(EmailMessage emailMessage) {
+		List<File> attachFiles = new LinkedList<>();
 		try {
 			String subject = emailMessage.getSubject();
 			LOG.info("Processing email message with subject '{}'", subject);
 			emailMessage = EmailMessage.bind(service, emailMessage.getId(), new PropertySet(ItemSchema.Attachments));
 			for (Attachment a : emailMessage.getAttachments())
 				if (a instanceof FileAttachment)
-					downloadAttachment((FileAttachment) a);
+					attachFiles.add(downloadAttachment((FileAttachment) a));
 			if (config.isEmailInboxCleanup()) {
 				LOG.debug("Removing email message with subject '{}'", subject);
 				emailMessage.delete(DeleteMode.HardDelete);
@@ -137,9 +148,10 @@ public class ExchangeMonitor extends AbstractMonitor implements
 		} catch (Exception ex) {
 			LOG.error(ex.getMessage(), ex);
 		}
+		return attachFiles;
 	}
 
-	private void downloadAttachment(final FileAttachment attach) throws Exception {
+	private File downloadAttachment(final FileAttachment attach) throws Exception {
 		String extGz = config.getEmailAttachExtGzip();
 		String extEnc = config.getEmailAttachExtEnc();
 
@@ -183,6 +195,7 @@ public class ExchangeMonitor extends AbstractMonitor implements
 			threadEnc.join();
 		}
 		LOG.info("Attachment was written into file '{}'", attachFile.getAbsolutePath());
+		return attachFile;
 	}
 
 	private boolean isSubjectMatched(String subject) {
@@ -204,14 +217,17 @@ public class ExchangeMonitor extends AbstractMonitor implements
 		openConnection();
 		try {
 			ItemView view = new ItemView(config.getEwsViewSize());
+			List<File> inboxFiles = new LinkedList<>();
 			for (FindItemsResults<Item> findResults = null;
 					 findResults == null || findResults.isMoreAvailable();
 					 view.setOffset(view.getOffset() + view.getPageSize())) {
 				findResults = service.findItems(WellKnownFolderName.Inbox, view);
 				for (Item item : findResults.getItems())
 					if (isSubjectMatched(item.getSubject()))
-						processEmail((EmailMessage) item);
+						inboxFiles.addAll(processEmail((EmailMessage) item));
 			}
+			if (!inboxFiles.isEmpty())
+				postMessage(new NewIncomingFilesMessage(inboxFiles));
 		} catch (Exception ex) {
 			LOG.error(ex.getMessage(), ex);
 		}
@@ -344,11 +360,14 @@ public class ExchangeMonitor extends AbstractMonitor implements
 		try {
 			ServiceResponseCollection<GetItemResponse> responses =
 					service.bindToItems(newMailsIds, new PropertySet(ItemSchema.Subject));
+			List<File> inboxFiles = new LinkedList<>();
 			for (GetItemResponse response : responses) {
 				Item item = response.getItem();
 				if (item instanceof EmailMessage && isSubjectMatched(item.getSubject()))
-					processEmail((EmailMessage) item);
+					inboxFiles.addAll(processEmail((EmailMessage) item));
 			}
+			if (!inboxFiles.isEmpty())
+				postMessage(new NewIncomingFilesMessage(inboxFiles));
 		} catch (Exception e) {
 			LOG.error(e.getMessage(), e);
 		}

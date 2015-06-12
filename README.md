@@ -42,8 +42,7 @@ are gathered as attachments into new email message, and this email message is
 sent away with specific subject. Then application waits for new files in
 "outbox" folder and does the same for all new files there.
 
-The Overall Diagram
--------------------
+### The Overall Diagram ###
 
 ![The Overall Diagram](./data/overall-diagram.png "The Overall Diagram")
 
@@ -55,8 +54,8 @@ Both sides have symmetric settings and work in absolutely the same manner.
 So the main flow may look like that:
 
 1. User of "Side 1" puts file or files into `outbox` folder (these files are
-   intended to be the result of Git command - see "Usage" section below for
-   details).
+   intended to be the result of Git command - see the **"Usage"** section below
+   for details).
 2. App on "Side 1" detects that new files are appeared in `outbox` and creates
    new Email message(s) where attaches these files (packed and/or encrypted if
    configured).
@@ -68,8 +67,8 @@ So the main flow may look like that:
 5. User of "Side 2" runs appropriate commands (e.g. Git) to apply new changes 
    represented by these files, and cleans up the `inbox` folder.
 
-The last point may be automated as well - this feature is in TODO list (look at
-the bottom of this README).
+The last point may be automated as well - see **"Post-Receive Script"** section
+below.
 
 Build And Run
 -------------
@@ -198,10 +197,6 @@ Each side should have its own set of `ews.*` properties and probably `proxy.*`
 ones. Rest of properties should be the same, except `ews.email` and
 `email.recipients.to` - they should be "crossed" as described above.
 
-### Git Email Mode ###
-
-[TBD]
-
 ### Git Bundle Mode ###
 
 This mode is about using [git-bundle] command.
@@ -230,7 +225,7 @@ It is initial phase of data exchange. You have to have the following:
     $ # Create the full project bundle from master branch
     $ # and drop it into outbox folder of your email-bridge app
     $ # File name will be in form email-bridge-<40_hex_digits_git_hash>.bundle
-    $ git bundle create "$EMAIL_BRIDGE_OUTBOX/email-bridge-`git rev-parse HEAD`.bundle" master
+    $ git bundle create "$OUTBOX_FOLDER/email-bridge-`git rev-parse HEAD`.bundle" master
     
     $ # Tag the current state of your Git repo to simplify
     $ # the further incremental bundle changes gathering.
@@ -246,7 +241,7 @@ go to the Side 2 host.
     $ cd email-bridge
     
     $ # Load received bundle content into FETCH_HEAD branch
-    $ git fetch $EMAIL_BRIDGE_INBOX/email-bridge-<40_hex_digits_git_hash>.bundle master
+    $ git fetch $INBOX_FOLDER/email-bridge-<40_hex_digits_git_hash>.bundle master
     
     $ # Merge FETCH_HEAD into current branch
     $ git merge FETCH_HEAD
@@ -257,7 +252,7 @@ go to the Side 2 host.
     $ git tag -f git-email-bridge 
 
     $ # Remove imported bundle
-    $ rm $EMAIL_BRIDGE_INBOX/email-bridge-<40_hex_digits_git_hash>.bundle
+    $ rm $INBOX_FOLDER/email-bridge-<40_hex_digits_git_hash>.bundle
 
 Now you can do `git push` if your repo has remote origin defined.
 
@@ -268,14 +263,14 @@ Side 1 in our example). Short command set for that:
 
 **Side 2:**
 
-    $ git bundle create "$EMAIL_BRIDGE_OUTBOX/email-bridge-`git rev-parse HEAD`.bundle" HEAD^..master
+    $ git bundle create "$OUTBOX_FOLDER/email-bridge-`git rev-parse HEAD`.bundle" HEAD^..master
 
 **Side 1:**
 
-    $ git fetch $EMAIL_BRIDGE_INBOX/email-bridge-<40_hex_digits_git_hash>.bundle master
+    $ git fetch $INBOX_FOLDER/email-bridge-<40_hex_digits_git_hash>.bundle master
     $ git merge FETCH_HEAD
     $ git tag -f git-email-bridge 
-    $ rm $EMAIL_BRIDGE_INBOX/email-bridge-<40_hex_digits_git_hash>.bundle
+    $ rm $INBOX_FOLDER/email-bridge-<40_hex_digits_git_hash>.bundle
 
 #### Case 2. Changes are committed on Side 1, need to be pushed to Side 2.
 
@@ -291,7 +286,7 @@ your changes should be transferred from Side 1 repo to Side 2 one.
 
     $ # Create the incremental bundle from master branch
     $ # and drop it into outbox folder of your email-bridge app
-    $ git bundle create "$EMAIL_BRIDGE_OUTBOX/email-bridge-`git rev-parse HEAD`.bundle" git-email-bridge..master
+    $ git bundle create "$OUTBOX_FOLDER/email-bridge-`git rev-parse HEAD`.bundle" git-email-bridge..master
     
     $ # Move tag to the current state of your Git repo
     $ # for further incremental bundle changes gathering.
@@ -307,7 +302,7 @@ go to the Side 2 host.
     $ cd email-bridge
     
     $ # Load received bundle content into FETCH_HEAD branch
-    $ git fetch $EMAIL_BRIDGE_INBOX/email-bridge-<40_hex_digits_git_hash>.bundle master
+    $ git fetch $INBOX_FOLDER/email-bridge-<40_hex_digits_git_hash>.bundle master
     
     $ # Merge FETCH_HEAD into current branch
     $ git merge FETCH_HEAD
@@ -318,9 +313,54 @@ go to the Side 2 host.
     $ git tag -f git-email-bridge 
 
     $ # Remove imported bundle
-    $ rm $EMAIL_BRIDGE_INBOX/email-bridge-<40_hex_digits_git_hash>.bundle
+    $ rm $INBOX_FOLDER/email-bridge-<40_hex_digits_git_hash>.bundle
 
 Now you can do `git push` if your repo has remote origin defined.
+
+### Git Email Mode ###
+
+[TBD]
+
+### Post-Receive Script ###
+
+If your actions right after you receive new files into `inbox` folder are the
+same and you want to perform them each time, then you can put them into script
+file that will be launched every time you have new data.
+
+Path to such script file (or any other executable) should be specified in
+`inbox.script` configuration property.   
+Positional arguments of this script are received file names (w/o paths) in
+order they were received and extracted from email attachments.
+Environment variables are system ones plus values from this config file, which
+names are property names that are upper-cased and dot-to-underscore replaced,
+so that e.g. property with name "inbox.script" will be represented as
+environment variable with name "INBOX_SCRIPT".
+
+You can find demo script [`inbox-demo.sh`](data/inbox-demo.sh) in `data`
+folder. This script does nothing, just prints some info into application log.
+
+For example in **"Case 2. Changes are committed on Side 1, need to be pushed to
+Side 2."** above such script may be written as:
+
+    #!/usr/bin/env bash
+    
+    cd "$HOME/workspace/email-bridge"
+    
+    for file; do
+    	git fetch "$INBOX_FOLDER/$file" master
+    	git merge FETCH_HEAD
+    	rm "$INBOX_FOLDER/$file"
+    done
+    
+    git tag -f git-email-bridge
+    git push
+    
+    exit 0
+
+Of course it is valid only for simple cases, when you have fast-forward commits
+only - no conflict resolving, no error handling, etc.
+Also, order of incoming files is important and you cannot apply the same bundle
+twice to the same branch.
 
 ### Tune Logging ###
 
@@ -342,10 +382,10 @@ References
 TODO
 ----
 
+0. Add setting to delete emails into Trash folder instead of hard remove.
+0. Add additional filtering emails by sender.
 0. Fix bug when several emails are processed at once.
 0. Add possibility to limit Email size and splitting it to several parts.
-0. Add possibility to invoke scripts as new email post-process action.
-0. Add setting to delete emails into Trash folder instead of hard remove.
 0. Setup ESW folder for data exchange, extend Config accordingly.
 0. Include daemonizing feature - to allow user start, stop and check status of
    service w/o additional complex scripts.
