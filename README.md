@@ -105,9 +105,14 @@ line arguments by specifying `-h` option:
 
 ### Notices ###
 
-On some Windows hosts in case if application is ran from Cygwin it works, but
-very slow - looks like there are some flaws in Cygwin Java threads management.  
-So, if you stuck with it - run application in `cmd.exe` tool instead.
+All command line examples in this document are written in Bash notation, so for
+Windows users the [Cygwin] installation is highly recommended. That will help
+you to unify all commands and scripts you may use on different platforms.
+
+On some Windows hosts (supposedly virtual) in case if application is ran from
+[Cygwin] it works, but very slow - looks like there are some flaws in Cygwin
+Java threads management.  
+So, if you stuck with it - just run application in `cmd.exe` tool instead.
 
 Usage
 -----
@@ -199,12 +204,13 @@ ones. Rest of properties should be the same, except `ews.email` and
 
 ### Git Bundle Mode ###
 
-This mode is about using [git-bundle] command.
+This mode is about using [git-bundle] command. This is recommended mode, b/c
+it allows to keep 2 directories as compatible as possible.
 
 In case if you select to use Git bundles to transfer changes from one side to
 another you may turn off the application attachment zipping feature, because
 Git bundles are packed already. Just specify `email.attach.gzip = false` in
-your configuration file. Though, if you don't - it will work w/o problems.
+your configuration file. Though, if you don't - it should work w/o problems.
 
 Below are most typical cases you may deal with.
 
@@ -319,7 +325,85 @@ Now you can do `git push` if your repo has remote origin defined.
 
 ### Git Email Mode ###
 
-[TBD]
+The alternative method to get and restore changes is to use [git-format-patch]
+and [git-am] commands respectively. You may find them usable in case if:
+
+* You have to synchronize data between repositories that have different nature,
+  e.g. Git <=> SVN <=> Hg <=> Perforce etc.
+* Git bundle that encloses all commits into one file may be too big for one
+  email message, especially when you move the big project initially, so that
+  splitting it to multiple patch files will simplify to transfer it by multiple
+  emails.
+
+The approach of getting and restore data is almost the same as in previous
+section, except key Git commands and file format.
+
+For this mode is important to pack patch files, b/c they are in plain text
+format. To do that just set `email.attach.gzip = true` in configuration file.
+
+#### Get full patch set from the beginning
+
+Let's start from the case when you need to make the initial project transfer
+so that you have to get all the commits from the project beginning.
+
+**Side 1:**
+
+    $ # Go to the Git-driven project folder
+    $ cd "$HOME/workspace/email-bridge"
+    
+    $ # Create the full patch set of current project branch
+    $ # and drop it into outbox folder of your email-bridge app.
+    $ # File names will be in form NNNN-<first-line-in-commit-message>.patch
+    $ # where NNNN - 4-digit index of patch in this patch set
+    $ git format-patch --root -o "$OUTBOX_FOLDER" origin
+
+    $ # Tag the current state of your Git repo to simplify
+    $ # the further incremental bundle changes gathering.
+    $ # Use tag name you like.
+    $ git tag -f git-email-bridge 
+
+#### Get partial patch set from tagged commit
+
+That's the same as before, but you have to move just part of work that is ready
+to be transferred after several commits.
+
+**Side 1:**
+
+    $ # Go to the Git-driven project folder
+    $ cd "$HOME/workspace/email-bridge"
+    
+    $ # Create the partial patch set of current project branch
+    $ # and drop it into outbox folder of your email-bridge app.
+    $ # File names will be in form NNNN-<first-line-in-commit-message>.patch
+    $ # where NNNN - 4-digit index of patch in this patch set
+    $ git format-patch --root -o "$OUTBOX_FOLDER" git-ews-dbsleuth..master
+
+    $ # Tag the current state of your Git repo to simplify
+    $ # the further incremental bundle changes gathering.
+    $ # Use tag name you like.
+    $ git tag -f git-email-bridge 
+
+#### Restore the patch set
+
+When you receive the patch set, and files were successfully created on
+acceptor's side, you have to apply them into your target repo.
+ 
+**Side 2:**
+
+    $ # Go to the Git-driven project folder
+    $ cd "$HOME/workspace/email-bridge"
+    
+    $ # Iterate through file patches, apply them into current branch
+    $ # and finally remove the applied patch file.
+    $ # for file in `ls -1 "$INBOX_FOLDER/*.patch"`; do git am $file; rm $file; done
+    
+    $ # Tag the current state of your Git repo
+    $ # for further incremental bundle changes gathering.
+    $ # Use tag name you used before.
+    $ git tag -f git-email-bridge 
+
+You may see set of warning messages about patch format, but if it isn't an
+errors you may don't care about them.
 
 ### Post-Receive Script ###
 
@@ -373,11 +457,13 @@ References
 2. [Move objects and refs by archive][git-bundle]
 3. [Prepare patches for e-mail submission][git-format-patch]
 4. [Apply a series of patches from a mailbox][git-am]
+5. [Cygwin Project][Cygwin]
 
 [ews-java-api]: https://github.com/OfficeDev/ews-java-api
 [git-bundle]: http://git-scm.com/docs/git-bundle
 [git-format-patch]: http://git-scm.com/docs/git-format-patch
 [git-am]: http://git-scm.com/docs/git-am
+[Cygwin]: http://cygwin.org/
 
 TODO
 ----
