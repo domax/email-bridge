@@ -59,4 +59,6 @@ public abstract class AbstractMonitor {
 	public abstract AbstractMonitor scan();
 
 	public abstract AbstractMonitor monitor();
+
+	public abstract AbstractMonitor stop();
 }

@@ -71,8 +71,8 @@ public class FolderMonitor extends AbstractMonitor implements Runnable {
 
 	private final Config config;
 	private final File outboxFolder;
-	private final WatchService watcher;
 	private final ArrayList<File> files = new ArrayList<>();
+	private Thread monitorThread;
 	private Timer timer;
 
 	private final FileFilter fileFilter = new FileFilter() {
@@ -93,7 +93,6 @@ public class FolderMonitor extends AbstractMonitor implements Runnable {
 	public FolderMonitor(Config config) throws IOException {
 		this.config = config;
 		outboxFolder = new File(config.getOutboxFolder());
-		watcher = FileSystems.getDefault().newWatchService();
 		if (outboxFolder.exists()) {
 			if (!outboxFolder.isDirectory())
 				throw new IOException("Specified path '" + outboxFolder.getAbsolutePath() + "' is a file, but folder expected");
@@ -113,14 +112,14 @@ public class FolderMonitor extends AbstractMonitor implements Runnable {
 	}
 
 	private void processFiles(List<File> files) throws IOException {
-		LOG.debug("Process files '{}'", files);
+		LOG.debug("Process files {}", files);
 		if (Utils.isEmpty(files)) return;
 		postMessage(new SendFileMessage(files));
 	}
 
 	public synchronized void runScriptAgainstReceivedFiles(List<File> inboxFiles) {
 		if (config.getInboxScript().isEmpty() || Utils.isEmpty(inboxFiles)) return;
-		LOG.debug("Run script '{}' against files '{}'", config.getInboxScript(), inboxFiles);
+		LOG.debug("Run script '{}' against files {}", config.getInboxScript(), inboxFiles);
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		try {
 			CommandLine cmd = CommandLine.parse(config.getInboxScript());
@@ -132,8 +131,16 @@ public class FolderMonitor extends AbstractMonitor implements Runnable {
 			Map<String, String> environment = EnvironmentUtils.getProcEnvironment();
 			environment.putAll(config.asEnvironmentMap());
 			executor.execute(cmd, environment);
-			LOG.info("Script {} successfully finished", config.getInboxScript());
+			LOG.info("Script '{}' successfully finished", config.getInboxScript());
 			LOG.debug("Script output:\n{}", out.toString());
+		} catch (ExecuteException e) {
+			LOG.error(e.getMessage(), e);
+			LOG.error("\nScript '{}' output:\n{}", config.getInboxScript(), out.toString());
+			int c = config.getInboxScriptStopCode();
+			if (c != 0 && c == e.getExitValue())
+				postMessage(new Main.StopMessage(
+						String.format("Script '%s' exited with code %d that is configured as stop code",
+								config.getInboxScript(), c)));
 		} catch (IOException e) {
 			LOG.error(e.getMessage(), e);
 			LOG.error("\nScript '{}' output:\n{}", config.getInboxScript(), out.toString());
@@ -157,16 +164,31 @@ public class FolderMonitor extends AbstractMonitor implements Runnable {
 
 	@Override
 	public FolderMonitor monitor() {
-		new Thread(this, FolderMonitor.class.getSimpleName()).start();
+		LOG.info("Start monitoring '{}' folder", outboxFolder.getAbsolutePath());
+		if (monitorThread == null) {
+			monitorThread = new Thread(this, FolderMonitor.class.getSimpleName());
+			monitorThread.start();
+		}
+		return this;
+	}
+
+	@Override
+	public FolderMonitor stop() {
+		LOG.info("Stop monitoring '{}' folder", outboxFolder.getAbsolutePath());
+		if (monitorThread != null) {
+			monitorThread.interrupt();
+			monitorThread = null;
+		}
 		return this;
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
 	public void run() {
-		LOG.info("Start monitoring '{}' folder", outboxFolder.getAbsolutePath());
 		Path outboxPath = outboxFolder.toPath();
+		WatchService watcher;
 		try {
+			watcher = FileSystems.getDefault().newWatchService();
 			outboxPath.register(watcher, ENTRY_CREATE);
 		} catch (IOException e) {
 			LOG.error(e.getMessage(), e);
@@ -204,5 +226,6 @@ public class FolderMonitor extends AbstractMonitor implements Runnable {
 				break;
 			}
 		}
+		monitorThread = null;
 	}
 }

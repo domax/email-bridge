@@ -241,7 +241,7 @@ public class ExchangeMonitor extends AbstractMonitor implements
 			try {
 				StreamingSubscription subscription = service.subscribeToStreamingNotifications(
 						Collections.singletonList(new FolderId(WellKnownFolderName.Inbox)), EventType.NewMail);
-				LOG.info("Setup streaming connection");
+				LOG.debug("Setup streaming connection");
 				StreamingSubscriptionConnection subscriptionConn =
 						new StreamingSubscriptionConnection(service, config.getEwsSubscriptionLifetime());
 				subscriptionConn.addSubscription(subscription);
@@ -254,6 +254,14 @@ public class ExchangeMonitor extends AbstractMonitor implements
 				postMessage(new Main.StopMessage(
 						"Streaming Subscription cannot be setup. Please verify settings and re-run application."));
 			}
+		return this;
+	}
+
+	@Override
+	public ExchangeMonitor stop() {
+		LOG.info("Stop connection to EWS server");
+		service.close();
+		service = null;
 		return this;
 	}
 
@@ -272,7 +280,8 @@ public class ExchangeMonitor extends AbstractMonitor implements
 	@Override
 	public void subscriptionErrorDelegate(Object sender, SubscriptionErrorEventArgs args) {
 		LOG.warn("Streaming subscription is disconnected", args.getException());
-		postMessage(new ReopenMonitorMessage());
+		if (service != null)
+			postMessage(new ReopenMonitorMessage());
 	}
 
 	public synchronized void sendFiles(List<File> files) {
@@ -292,8 +301,10 @@ public class ExchangeMonitor extends AbstractMonitor implements
 			final Map<File, InputStream> attachmentStreams = new HashMap<>();
 			for (File file : files) {
 				final Object[] params = {config.getEmailTagOutgoing(), new Date(), file.getName()};
-				subjectBuilder.append(config.getEmailSubjectFormat().format(params)).append(" ");
-				bodyBuilder.append(config.getEmailBodyFormat().format(params)).append("\n");
+				if (subjectBuilder.length() > 0) subjectBuilder.append(" ");
+				subjectBuilder.append(config.getEmailSubjectFormat().format(params));
+				if (bodyBuilder.length() > 0) bodyBuilder.append("\n");
+				bodyBuilder.append(config.getEmailBodyFormat().format(params));
 				attachmentStreams.put(file, addFileAttachment(msg.getAttachments(), file));
 			}
 			msg.setSubject(Utils.makeTeaser(subjectBuilder.toString(), 78, "..."));

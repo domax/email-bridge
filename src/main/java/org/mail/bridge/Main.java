@@ -128,6 +128,9 @@ public class Main implements Runnable {
 						exchangeMonitor.sendFiles(((FolderMonitor.SendFileMessage) message).getData());
 					else if (message instanceof StopMessage) {
 						System.out.println(((StopMessage) message).getData());
+						exchangeMonitor.stop();
+						folderMonitor.stop();
+						Thread.currentThread().interrupt();
 						break;
 					} else LOG.warn("Unsupported message {}", message);
 					Thread.sleep(10);

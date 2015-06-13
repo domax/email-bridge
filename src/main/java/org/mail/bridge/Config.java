@@ -66,6 +66,7 @@ public class Config {
 
 	private final String inboxFolder;
 	private final String inboxScript;
+	private final int inboxScriptStopCode;
 
 	private final String emailTagIncoming;
 	private final String emailTagOutgoing;
@@ -115,6 +116,8 @@ public class Config {
 		s = config.getProperty("inbox.folder", "");
 		inboxFolder = s.isEmpty() ? System.getProperty("java.io.tmpdir") + File.separator + "inbox" : s;
 		inboxScript = config.getProperty("inbox.script", "");
+		s = config.getProperty("inbox.script.stop.code", "");
+		inboxScriptStopCode = s.isEmpty() ? 0 : Integer.parseInt(s);
 
 		s = config.getProperty("email.tag.incoming", "");
 		emailTagIncoming = s.isEmpty() ? "email-bridge" : s;
@@ -229,6 +232,10 @@ public class Config {
 		return inboxScript;
 	}
 
+	public int getInboxScriptStopCode() {
+		return inboxScriptStopCode;
+	}
+
 	public boolean isEmailInboxCleanup() {
 		return emailInboxCleanup;
 	}
@@ -296,6 +303,7 @@ public class Config {
 		result.put("OUTBOX_FILE_REGEXP", outboxFileRegexp);
 		result.put("INBOX_FOLDER", inboxFolder);
 		result.put("INBOX_SCRIPT", inboxScript);
+		result.put("INBOX_SCRIPT_STOP_CODE", "" + inboxScriptStopCode);
 		result.put("EMAIL_TAG_INCOMING", emailTagIncoming);
 		result.put("EMAIL_TAG_OUTGOING", emailTagOutgoing);
 		result.put("EMAIL_SUBJECT_FORMAT", emailSubjectFormat.toPattern());
@@ -331,6 +339,7 @@ public class Config {
 				",\n\toutboxFileRegexp='" + outboxFileRegexp + '\'' +
 				",\n\tinboxFolder='" + inboxFolder + '\'' +
 				",\n\tinboxScript='" + inboxScript + '\'' +
+				",\n\tinboxScriptStopCode=" + inboxScriptStopCode +
 				",\n\temailTagIncoming='" + emailTagIncoming + '\'' +
 				",\n\temailTagOutgoing='" + emailTagOutgoing + '\'' +
 				",\n\temailSubjectFormat='" + emailSubjectFormat.toPattern() + '\'' +
