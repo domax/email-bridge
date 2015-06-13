@@ -32,7 +32,7 @@ How It Works In A Nutshell
 
 When application runs, first of all it scans your EWS inbox
 for transport email, matching subject to specific pattern and, if such emails
-found, extracts files from their attachments. Then is waits for new messages
+found, extracts files from their attachments. Then it waits for new messages
 and does the same for all new matched emails. All transport emails are removed
 automatically.
 
@@ -83,8 +83,8 @@ To build and run this application you need:
 
 ### Build ###
 
-This project is Maven-driven, so all what you need to do to build it is run the
-following command:
+This project is Maven-driven, so all what you need to do to build it is to run
+the following command:
 
     $ mvn clean package
 
@@ -99,13 +99,13 @@ Where `X.X.X` is current version number.
 
 The invocation w/o arguments will show an error that proper configuration file
 is required. Just in case - you can get the short help about supported command
-line argument by specifying `-h` option:
+line arguments by specifying `-h` option:
 
     $ java -jar target/email-bridge-X.X.X-standalone.jar -h
 
 ### Notices ###
 
-On some Windows hosts in case if application is ran from Cygwin it works but
+On some Windows hosts in case if application is ran from Cygwin it works, but
 very slow - looks like there are some flaws in Cygwin Java threads management.  
 So, if you stuck with it - run application in `cmd.exe` tool instead.
 
@@ -208,7 +208,7 @@ your configuration file. Though, if you don't - it will work w/o problems.
 
 Below are most typical cases you may deal with.
 
-#### Case 1. Existing repo on Side 1 and new empty repo on Side 2.
+#### Case 1. Existing repo on Side 1 and new empty repo on Side 2
 
 It is initial phase of data exchange. You have to have the following:
 
@@ -220,7 +220,7 @@ It is initial phase of data exchange. You have to have the following:
 **Side 1:**
 
     $ # Go to the Git-driven project folder
-    $ cd email-bridge
+    $ cd "$HOME/workspace/email-bridge"
     
     $ # Create the full project bundle from master branch
     $ # and drop it into outbox folder of your email-bridge app
@@ -238,7 +238,7 @@ go to the Side 2 host.
 **Side 2:**
 
     $ # Go to the Git-driven project folder
-    $ cd email-bridge
+    $ cd "$HOME/workspace/email-bridge"
     
     $ # Load received bundle content into FETCH_HEAD branch
     $ git fetch $INBOX_FOLDER/email-bridge-<40_hex_digits_git_hash>.bundle master
@@ -272,7 +272,7 @@ Side 1 in our example). Short command set for that:
     $ git tag -f git-email-bridge 
     $ rm $INBOX_FOLDER/email-bridge-<40_hex_digits_git_hash>.bundle
 
-#### Case 2. Changes are committed on Side 1, need to be pushed to Side 2.
+#### Case 2. Changes are committed on Side 1, need to be pushed to Side 2
 
 This is typical iterated phase when you did part of work and want to transfer
 your changes to remote side.
@@ -282,7 +282,7 @@ your changes should be transferred from Side 1 repo to Side 2 one.
 **Side 1:**
 
     $ # Go to the Git-driven project folder
-    $ cd email-bridge
+    $ cd "$HOME/workspace/email-bridge"
 
     $ # Create the incremental bundle from master branch
     $ # and drop it into outbox folder of your email-bridge app
@@ -299,7 +299,7 @@ go to the Side 2 host.
 **Side 2:**
 
     $ # Go to the Git-driven project folder
-    $ cd email-bridge
+    $ cd "$HOME/workspace/email-bridge"
     
     $ # Load received bundle content into FETCH_HEAD branch
     $ git fetch $INBOX_FOLDER/email-bridge-<40_hex_digits_git_hash>.bundle master
@@ -340,7 +340,7 @@ You can find demo script [`inbox-demo.sh`](data/inbox-demo.sh) in `data`
 folder. This script does nothing, just prints some info into application log.
 
 For example in **"Case 2. Changes are committed on Side 1, need to be pushed to
-Side 2."** above such script may be written as:
+Side 2"** above such script may be written as:
 
     #!/usr/bin/env bash
     

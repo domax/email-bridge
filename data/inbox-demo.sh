@@ -7,7 +7,7 @@
 
 # Print all available environment variables
 set
-# Print while line to separate list of input files
+# Print white line to separate list of input files
 echo
 
 # Iterate thru arguments that are file names
