@@ -374,13 +374,11 @@ to be transferred after several commits.
     
     $ # Create the partial patch set of current project branch
     $ # and drop it into outbox folder of your email-bridge app.
-    $ # File names will be in form NNNN-<first-line-in-commit-message>.patch
-    $ # where NNNN - 4-digit index of patch in this patch set
-    $ git format-patch --root -o "$OUTBOX_FOLDER" git-ews-dbsleuth..master
+    $ git format-patch --root -o "$OUTBOX_FOLDER" git-email-bridge..master
 
     $ # Tag the current state of your Git repo to simplify
     $ # the further incremental bundle changes gathering.
-    $ # Use tag name you like.
+    $ # Use tag name you used before.
     $ git tag -f git-email-bridge 
 
 #### Restore the patch set
