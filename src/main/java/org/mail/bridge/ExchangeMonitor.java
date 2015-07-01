@@ -43,6 +43,10 @@ import microsoft.exchange.webservices.data.notification.*;
 import microsoft.exchange.webservices.data.property.complex.*;
 import microsoft.exchange.webservices.data.search.FindItemsResults;
 import microsoft.exchange.webservices.data.search.ItemView;
+import net.lingala.zip4j.core.ZipFile;
+import net.lingala.zip4j.exception.ZipException;
+import net.lingala.zip4j.model.ZipParameters;
+import net.lingala.zip4j.util.Zip4jConstants;
 import org.mail.bridge.util.EncryptUtil;
 import org.mail.bridge.util.Utils;
 import org.slf4j.Logger;
@@ -50,8 +54,13 @@ import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.net.URI;
+import java.nio.file.Files;
 import java.text.ParseException;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import static java.lang.Thread.sleep;
 
 /**
  * @author <a href="mailto:max@dominichenko.com">Maksym Dominichenko</a>
@@ -61,6 +70,9 @@ public class ExchangeMonitor extends AbstractMonitor implements
 		StreamingSubscriptionConnection.ISubscriptionErrorDelegate {
 
 	private static final Logger LOG = LoggerFactory.getLogger(ExchangeMonitor.class);
+	private static final Pattern RE_ZIP_VOL =
+			Pattern.compile("^([0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12})_(\\d+)\\.z\\d{2}$", Pattern.CASE_INSENSITIVE);
+	private static final String ZIP_EXT = ".z00";
 
 	public static class NewMailMessage extends Message<List<ItemId>> {
 		public NewMailMessage(List<ItemId> emails) {
@@ -139,16 +151,67 @@ public class ExchangeMonitor extends AbstractMonitor implements
 			LOG.info("Processing email message with subject '{}'", subject);
 			emailMessage = EmailMessage.bind(service, emailMessage.getId(), new PropertySet(ItemSchema.Attachments));
 			for (Attachment a : emailMessage.getAttachments())
-				if (a instanceof FileAttachment)
-					attachFiles.add(downloadAttachment((FileAttachment) a));
-			if (config.isEmailInboxCleanup()) {
-				LOG.debug("Removing email message with subject '{}'", subject);
-				emailMessage.delete(DeleteMode.HardDelete);
-			}
+				if (a instanceof FileAttachment) {
+					File file = downloadAttachment((FileAttachment) a);
+					final Matcher matcher = RE_ZIP_VOL.matcher(file.getName());
+					if (matcher.matches()) {
+						LOG.debug("New volume detected: '{}'", file.getName());
+						int expectedCount = Integer.parseInt(matcher.group(3));
+						File dir = file.getParentFile();
+						File[] parts = Utils.ensureEmpty(dir.listFiles(new FilenameFilter() {
+							@Override
+							public boolean accept(File dir, String name) {
+								return name.startsWith(matcher.group(1) + "_" + matcher.group(3) + ".z");
+							}
+						}));
+						if (parts.length == expectedCount) {
+							LOG.info("All {} volumes received, extracting files", expectedCount);
+							File unzipDir = Files.createTempDirectory("eb-unzip-").toFile();
+							LOG.debug("Created temporary folder '{}' to unZIP volumes", unzipDir.getAbsolutePath());
+
+							final ZipFile zip = new ZipFile(new File(dir, matcher.group(1) + "_" + matcher.group(3) + ZIP_EXT));
+							zip.extractAll(unzipDir.getAbsolutePath());
+							for (File part : parts)
+								if (part.delete()) LOG.debug("Part file '{}' was successfully removed", part.getAbsolutePath());
+								else LOG.warn("Cannot remove part file '{}'", part.getAbsolutePath());
+
+							attachFiles.addAll(extractAttachmentFiles(unzipDir));
+							removeTempDir(unzipDir);
+						} else LOG.debug("Only {} volume(s) of {} received, waiting for the rest", parts.length, expectedCount);
+					} else attachFiles.add(file);
+				}
 		} catch (Exception ex) {
 			LOG.error(ex.getMessage(), ex);
 		}
 		return attachFiles;
+	}
+
+	private List<File> extractAttachmentFiles(File dir) throws IOException {
+		final List<File> result = new LinkedList<>();
+		if (dir == null || !dir.exists() || !dir.isDirectory()) return result;
+
+		String extGz = config.getEmailAttachExtGzip();
+		String extEnc = config.getEmailAttachExtEnc();
+
+		for (File file : Utils.ensureEmpty(dir.listFiles())) {
+			LOG.debug("Extracting file '{}'", file.getAbsolutePath());
+			String fileName = file.getName();
+			final boolean isEncrypted = fileName.endsWith(extEnc);
+			if (isEncrypted) fileName = fileName.substring(0, fileName.length() - extEnc.length());
+			final boolean isGzipped = fileName.endsWith(extGz);
+			if (isGzipped) fileName = fileName.substring(0, fileName.length() - extGz.length());
+			File extractFile = new File(config.getInboxFolder(), fileName);
+			try (final InputStream is = new BufferedInputStream(new FileInputStream(file));
+					 final OutputStream os = new BufferedOutputStream(new FileOutputStream(extractFile))) {
+				if (isEncrypted && isGzipped) EncryptUtil.decryptGunzip(config.getEmailAttachPassword(), is, os);
+				else if (isEncrypted) EncryptUtil.decrypt(config.getEmailAttachPassword(), is, os);
+				else if (isGzipped) EncryptUtil.gunzip(is, os);
+				else EncryptUtil.copy(is, os);
+			}
+			result.add(extractFile);
+			LOG.info("A file '{}' was extracted", extractFile.getName());
+		}
+		return result;
 	}
 
 	private File downloadAttachment(final FileAttachment attach) throws Exception {
@@ -211,20 +274,33 @@ public class ExchangeMonitor extends AbstractMonitor implements
 		return false;
 	}
 
+	private void removeEmails(List<EmailMessage> emails) throws Exception {
+		if (Utils.isEmpty(emails) || !config.isEmailInboxCleanup()) return;
+		LOG.info("Removing {} processed messages", emails.size());
+		for (EmailMessage emailMessage : emails) {
+			LOG.debug("Removing email message with subject '{}'", emailMessage.getSubject());
+			emailMessage.delete(DeleteMode.HardDelete);
+		}
+	}
+
 	@Override
 	public synchronized ExchangeMonitor scan() {
 		LOG.info("Start scanning '{}' mail folder", WellKnownFolderName.Inbox);
 		openConnection();
 		try {
-			ItemView view = new ItemView(config.getEwsViewSize());
-			List<File> inboxFiles = new LinkedList<>();
+			final ItemView view = new ItemView(config.getEwsViewSize());
+			final List<File> inboxFiles = new LinkedList<>();
 			for (FindItemsResults<Item> findResults = null;
 					 findResults == null || findResults.isMoreAvailable();
 					 view.setOffset(view.getOffset() + view.getPageSize())) {
 				findResults = service.findItems(WellKnownFolderName.Inbox, view);
+				final List<EmailMessage> processedEmails = new LinkedList<>();
 				for (Item item : findResults.getItems())
-					if (isSubjectMatched(item.getSubject()))
+					if (isSubjectMatched(item.getSubject())) {
 						inboxFiles.addAll(processEmail((EmailMessage) item));
+						processedEmails.add((EmailMessage) item);
+					}
+				removeEmails(processedEmails);
 			}
 			if (!inboxFiles.isEmpty())
 				postMessage(new NewIncomingFilesMessage(inboxFiles));
@@ -285,85 +361,161 @@ public class ExchangeMonitor extends AbstractMonitor implements
 	}
 
 	public synchronized void sendFiles(List<File> files) {
-		LOG.info("Sending files '{}'", files);
 		if (Utils.isEmpty(files)) return;
-		openConnection();
+		LOG.info("Sending files '{}'", files);
+
+		File tempDir = null;
+		File zipDir = null;
+		long attachSize = 0;
+		long maxSize = config.getEmailAttachMaxSize() * 1024 * 1024;
+
+		// Prepare all whole attachment files that are ready for sending in temp dir
 		try {
-			final EmailMessage msg = new EmailMessage(service);
-			for (String email : config.getEmailRecipientsTo())
-				msg.getToRecipients().add(email);
-			for (String email : config.getEmailRecipientsCc())
-				msg.getCcRecipients().add(email);
-			for (String email : config.getEmailRecipientsBcc())
-				msg.getBccRecipients().add(email);
+			tempDir = Files.createTempDirectory("eb-attach-").toFile();
+			LOG.debug("Created temporary folder '{}' for file attachments", tempDir.getAbsolutePath());
+			for (File file : files) {
+				File attachFile = prepareFileAttachment(tempDir, file);
+				attachSize += attachFile.length();
+			}
+		} catch (IOException e) {
+			LOG.error(e.getMessage(), e);
+		}
+		if (tempDir == null) return;
+
+		if (attachSize > maxSize) {
+			// Pack attachment files into ZIP archive divided by volumes
+			try {
+				zipDir = Files.createTempDirectory("eb-zip-").toFile();
+				LOG.debug("Created temporary folder '{}' for ZIP volumes", zipDir.getAbsolutePath());
+				ZipFile zip = new ZipFile(new File(zipDir, UUID.randomUUID().toString() + ZIP_EXT));
+				ZipParameters parameters = new ZipParameters();
+				parameters.setCompressionMethod(Zip4jConstants.COMP_STORE);
+				parameters.setIncludeRootFolder(false);
+				zip.createZipFileFromFolder(tempDir, parameters, true, maxSize);
+				LOG.debug("ZIP volumes created: {}", zip.getSplitZipFiles());
+			} catch (ZipException | IOException e) {
+				LOG.error(e.getMessage(), e);
+			}
+		}
+
+		int messages = 0;
+		try {
+			openConnection();
+			if (zipDir != null) messages += sendFilesFromDirOnePerEmail(zipDir);
+			else messages += sendFilesFromDirAsOneEmail(tempDir);
+		} finally {
+			// Remove all temporary files
+			removeTempDir(tempDir);
+			removeTempDir(zipDir);
+		}
+
+		if (config.isOutboxCleanup()) {
+			LOG.debug("Outbox is configured to auto-cleanup: {} file(s) to remove.", files.size());
+			for (File file : files) {
+				if (file.delete()) LOG.debug("File '{}' was successfully removed", file.getAbsolutePath());
+				else LOG.warn("Cannot remove file '{}'", file.getAbsolutePath());
+			}
+		}
+
+		LOG.info("Sent {} message(s)", messages);
+	}
+
+	private EmailMessage createEmailMessage() throws Exception {
+		final EmailMessage msg = new EmailMessage(service);
+		for (String email : config.getEmailRecipientsTo())
+			msg.getToRecipients().add(email);
+		for (String email : config.getEmailRecipientsCc())
+			msg.getCcRecipients().add(email);
+		for (String email : config.getEmailRecipientsBcc())
+			msg.getBccRecipients().add(email);
+		return msg;
+	}
+
+	private int sendFilesFromDirAsOneEmail(File dir) {
+		if (dir == null || !dir.exists() || !dir.isDirectory()) return 0;
+		File[] files = dir.listFiles();
+		if (Utils.isEmpty(files)) return 0;
+		try {
+			final EmailMessage msg = createEmailMessage();
 			final StringBuilder bodyBuilder = new StringBuilder();
 			final StringBuilder subjectBuilder = new StringBuilder();
-			final Map<File, InputStream> attachmentStreams = new HashMap<>();
 			for (File file : files) {
 				final Object[] params = {config.getEmailTagOutgoing(), new Date(), file.getName()};
 				if (subjectBuilder.length() > 0) subjectBuilder.append(" ");
 				subjectBuilder.append(config.getEmailSubjectFormat().format(params));
 				if (bodyBuilder.length() > 0) bodyBuilder.append("\n");
 				bodyBuilder.append(config.getEmailBodyFormat().format(params));
-				attachmentStreams.put(file, addFileAttachment(msg.getAttachments(), file));
+				msg.getAttachments().addFileAttachment(file.getAbsolutePath());
 			}
 			msg.setSubject(Utils.makeTeaser(subjectBuilder.toString(), 78, "..."));
 			msg.setBody(MessageBody.getMessageBodyFromText(bodyBuilder.toString()));
 			msg.send();
 			LOG.debug("Email with subject '{}' was successfully sent", msg.getSubject());
+			return 1;
+		} catch (Exception ex) {
+			LOG.error(ex.getMessage(), ex);
+			return 0;
+		}
+	}
 
-			for (Map.Entry<File, InputStream> entry : attachmentStreams.entrySet())
-				try {
-					entry.getValue().close();
-					LOG.debug("Input stream of file '{}' was successfully closed", entry.getKey().getAbsolutePath());
-				} catch (IOException ex) {
-					LOG.warn("Cannot close input stream of file '{}' because of error {}",
-							entry.getKey().getAbsolutePath(), ex.getMessage());
-				}
-
-			if (config.isOutboxCleanup()) {
-				LOG.debug("Outbox is configured to auto-cleanup: {} file(s) to remove.", files.size());
-				for (File file : files) {
-					if (file.delete()) LOG.debug("File '{}' was successfully removed", file.getAbsolutePath());
-					else LOG.warn("Cannot remove file '{}'", file.getAbsolutePath());
-				}
+	private int sendFilesFromDirOnePerEmail(File dir) {
+		if (dir == null || !dir.exists() || !dir.isDirectory()) return 0;
+		File[] files = dir.listFiles();
+		if (Utils.isEmpty(files)) return 0;
+		int messages = 0;
+		try {
+			for (File file : files) {
+				final EmailMessage msg = createEmailMessage();
+				String fileName = file.getName().replaceFirst("\\.", "_" + files.length + ".");
+				final Object[] params = {config.getEmailTagOutgoing(), new Date(), fileName};
+				msg.setSubject(Utils.makeTeaser(config.getEmailSubjectFormat().format(params), 78, "..."));
+				msg.setBody(MessageBody.getMessageBodyFromText(config.getEmailBodyFormat().format(params)));
+				msg.getAttachments().addFileAttachment(fileName, file.getAbsolutePath());
+				msg.send();
+				LOG.debug("Email with subject '{}' was successfully sent", msg.getSubject());
+				++messages;
+				sleep(100);
 			}
 		} catch (Exception ex) {
 			LOG.error(ex.getMessage(), ex);
 		}
+		return messages;
 	}
 
-	private InputStream addFileAttachment(AttachmentCollection attachments, final File file)
-			throws IOException {
+	private File prepareFileAttachment(File folder, File file) throws IOException {
 		String fileName = file.getName();
 		if (config.isEmailAttachGzip()) fileName += config.getEmailAttachExtGzip();
 		if (!config.getEmailAttachPassword().isEmpty()) fileName += config.getEmailAttachExtEnc();
+		LOG.debug("Preparing file attachment with name '{}'", fileName);
+		File attachFile = new File(folder, fileName);
+		try (InputStream is = new BufferedInputStream(new FileInputStream(file));
+				 OutputStream os = new BufferedOutputStream(new FileOutputStream(attachFile))) {
+			if (config.isEmailAttachGzip() && !config.getEmailAttachPassword().isEmpty())
+				EncryptUtil.gzipEncrypt(config.getEmailAttachPassword(), is, os);
+			else if (!config.getEmailAttachPassword().isEmpty())
+				EncryptUtil.encrypt(config.getEmailAttachPassword(), is, os);
+			else if (config.isEmailAttachGzip())
+				EncryptUtil.gzip(is, os);
+			else
+				EncryptUtil.copy(is, os);
+		}
+		return attachFile;
+	}
 
-		LOG.debug("Opening stream for attachment file with name '{}'", fileName);
-		final PipedOutputStream output = new PipedOutputStream();
-		final PipedInputStream input = new PipedInputStream(output);
-		final InputStream is = new BufferedInputStream(new FileInputStream(file));
-		final Thread thread = new Thread(new Runnable() {
-			@Override
-			public void run() {
-				try {
-					if (config.isEmailAttachGzip() && !config.getEmailAttachPassword().isEmpty())
-						EncryptUtil.gzipEncrypt(config.getEmailAttachPassword(), is, output);
-					else if (!config.getEmailAttachPassword().isEmpty())
-						EncryptUtil.encrypt(config.getEmailAttachPassword(), is, output);
-					else if (config.isEmailAttachGzip())
-						EncryptUtil.gzip(is, output);
-					else
-						EncryptUtil.copy(is, output);
-					output.close();
-				} catch (IOException e) {
-					LOG.error(e.getMessage(), e);
-				}
-			}
-		}, "addFileAttachment-thread");
-		thread.start();
-		attachments.addFileAttachment(fileName, input);
-		return is;
+	private void removeTempDir(File dir) {
+		if (dir == null || !dir.exists() || !dir.isDirectory()) return;
+		File[] files = Utils.ensureEmpty(dir.listFiles());
+		for (File file : files)
+			if (file.delete()) LOG.debug("Temporary file '{}' was successfully removed", file.getAbsolutePath());
+			else LOG.warn("Cannot remove temporary file '{}'", file.getAbsolutePath());
+		// Let's give a chance to FS to remove files before removing temp folder itself
+		try {
+			sleep(100);
+		} catch (InterruptedException e) {
+			LOG.error(e.getMessage(), e);
+		}
+		if (dir.delete()) LOG.debug("Temporary folder '{}' was successfully removed", dir.getAbsolutePath());
+		else LOG.error("Cannot remove temporary folder '{}'", dir.getAbsolutePath());
 	}
 
 	public synchronized void processNewMail(List<ItemId> newMailsIds) {
@@ -371,12 +523,16 @@ public class ExchangeMonitor extends AbstractMonitor implements
 		try {
 			ServiceResponseCollection<GetItemResponse> responses =
 					service.bindToItems(newMailsIds, new PropertySet(ItemSchema.Subject));
-			List<File> inboxFiles = new LinkedList<>();
+			final List<File> inboxFiles = new LinkedList<>();
+			final List<EmailMessage> processedEmails = new LinkedList<>();
 			for (GetItemResponse response : responses) {
 				Item item = response.getItem();
-				if (item instanceof EmailMessage && isSubjectMatched(item.getSubject()))
+				if (item instanceof EmailMessage && isSubjectMatched(item.getSubject())) {
 					inboxFiles.addAll(processEmail((EmailMessage) item));
+					processedEmails.add((EmailMessage) item);
+				}
 			}
+			removeEmails(processedEmails);
 			if (!inboxFiles.isEmpty())
 				postMessage(new NewIncomingFilesMessage(inboxFiles));
 		} catch (Exception e) {

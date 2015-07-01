@@ -83,12 +83,6 @@ public class FolderMonitor extends AbstractMonitor implements Runnable {
 					&& (config.getOutboxFileRegexp().isEmpty() || file.getName().matches(config.getOutboxFileRegexp()));
 		}
 	};
-	private final Comparator<File> outboxFileComparator = new Comparator<File>() {
-		@Override
-		public int compare(File o1, File o2) {
-			return (int) (o1.lastModified() - o2.lastModified());
-		}
-	};
 
 	public FolderMonitor(Config config) throws IOException {
 		this.config = config;
@@ -130,6 +124,7 @@ public class FolderMonitor extends AbstractMonitor implements Runnable {
 			executor.setWatchdog(new ExecuteWatchdog(SCRIPT_TIMEOUT));
 			Map<String, String> environment = EnvironmentUtils.getProcEnvironment();
 			environment.putAll(config.asEnvironmentMap());
+			executor.setWorkingDirectory(new File(System.getProperty("user.dir")));
 			executor.execute(cmd, environment);
 			LOG.info("Script '{}' successfully finished", config.getInboxScript());
 			LOG.debug("Script output:\n{}", out.toString());
@@ -151,7 +146,7 @@ public class FolderMonitor extends AbstractMonitor implements Runnable {
 	public synchronized FolderMonitor scan() {
 		LOG.info("Start scanning '{}' folder", outboxFolder.getAbsolutePath());
 		File[] files = Utils.ensureEmpty(outboxFolder.listFiles(fileFilter));
-		Arrays.sort(files, outboxFileComparator);
+		Arrays.sort(files, Utils.LAST_MODIFIED_COMPARATOR);
 		LOG.debug("Discovered {} file(s)", files.length);
 		if (!Utils.isEmpty(files))
 			try {

@@ -80,6 +80,7 @@ public class Config {
 	private final boolean emailAttachGzip;
 	private final String emailAttachExtGzip;
 	private final String emailAttachExtEnc;
+	private final int emailAttachMaxSize;
 
 	public Config(String propertiesFileName) throws IOException {
 		Properties config = new Properties();
@@ -159,9 +160,11 @@ public class Config {
 		emailAttachGzip = !s.isEmpty() && Boolean.parseBoolean(s);
 
 		s = config.getProperty("email.attach.ext.gzip", "");
-		emailAttachExtGzip = s.isEmpty() ? ".gz" : s;
+		emailAttachExtGzip = checkExt(s.isEmpty() ? ".gz" : s);
 		s = config.getProperty("email.attach.ext.enc", "");
-		emailAttachExtEnc = s.isEmpty() ? ".enc" : s;
+		emailAttachExtEnc = checkExt(s.isEmpty() ? ".enc" : s);
+		s = config.getProperty("email.attach.max.size", "");
+		emailAttachMaxSize = s.isEmpty() ? 5 : Integer.parseInt(s);
 	}
 
 	public String getEwsEmail() {
@@ -284,6 +287,10 @@ public class Config {
 		return emailAttachExtEnc;
 	}
 
+	public int getEmailAttachMaxSize() {
+		return emailAttachMaxSize;
+	}
+
 	public Map<String, String> asEnvironmentMap() {
 		Map<String, String> result = new HashMap<>();
 		result.put("EWS_EMAIL", ewsEmail);
@@ -316,7 +323,14 @@ public class Config {
 		result.put("EMAIL_ATTACH_GZIP", "" + emailAttachGzip);
 		result.put("EMAIL_ATTACH_EXT_GZIP", emailAttachExtGzip);
 		result.put("EMAIL_ATTACH_EXT_ENC", emailAttachExtEnc);
+		result.put("EMAIL_ATTACH_MAX_SIZE", "" + emailAttachMaxSize);
 		return result;
+	}
+
+	private String checkExt(String ext) throws IOException {
+		if (ext.matches("^\\.z\\d\\d$"))
+			throw new IOException(String.format("Extension '%s' is reserved for inner usage", ext));
+		return ext;
 	}
 
 	@Override
@@ -352,6 +366,7 @@ public class Config {
 				",\n\temailAttachGzip=" + emailAttachGzip +
 				",\n\temailAttachExtGzip='" + emailAttachExtGzip + '\'' +
 				",\n\temailAttachExtEnc='" + emailAttachExtEnc + '\'' +
+				",\n\temailAttachMaxSize=" + emailAttachMaxSize +
 				'}';
 	}
 }

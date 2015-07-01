@@ -23,6 +23,7 @@
  */
 package org.mail.bridge.util;
 
+import java.io.File;
 import java.util.*;
 
 /**
@@ -30,6 +31,13 @@ import java.util.*;
  */
 @SuppressWarnings("unused")
 public class Utils {
+
+	public static final Comparator<File> LAST_MODIFIED_COMPARATOR = new Comparator<File>() {
+		@Override
+		public int compare(File o1, File o2) {
+			return (int) (o1.lastModified() - o2.lastModified());
+		}
+	};
 
 	/**
 	 * Helper to check if the String is {@code null} or empty.<br/>

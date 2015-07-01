@@ -468,8 +468,6 @@ TODO
 
 0. Add setting to delete emails into Trash folder instead of hard remove.
 0. Add additional filtering emails by sender.
-0. Fix bug when several emails are processed at once.
-0. Add possibility to limit Email size and splitting it to several parts.
 0. Setup ESW folder for data exchange, extend Config accordingly.
 0. Include daemonizing feature - to allow user start, stop and check status of
    service w/o additional complex scripts.
