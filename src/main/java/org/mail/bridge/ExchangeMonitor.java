@@ -61,6 +61,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.lang.Thread.sleep;
+import static java.util.regex.Pattern.CASE_INSENSITIVE;
+import static java.util.regex.Pattern.compile;
 
 /**
  * @author <a href="mailto:max@dominichenko.com">Maksym Dominichenko</a>
@@ -70,8 +72,9 @@ public class ExchangeMonitor extends AbstractMonitor implements
 		StreamingSubscriptionConnection.ISubscriptionErrorDelegate {
 
 	private static final Logger LOG = LoggerFactory.getLogger(ExchangeMonitor.class);
-	private static final Pattern RE_ZIP_VOL =
-			Pattern.compile("^([0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12})_(\\d+)\\.z\\d{2}$", Pattern.CASE_INSENSITIVE);
+	private static final String RE_UUID = "[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}";
+	private static final Pattern RE_ATTACH_VOL = compile("^(" + RE_UUID + "_\\d+)\\.(\\d{2})$", CASE_INSENSITIVE);
+	private static final Pattern RE_ZIP_VOL = compile("^(" + RE_UUID + ")_(\\d+)\\.z\\d{2}$", CASE_INSENSITIVE);
 	private static final String ZIP_EXT = ".z00";
 
 	public static class NewMailMessage extends Message<List<ItemId>> {
@@ -106,7 +109,6 @@ public class ExchangeMonitor extends AbstractMonitor implements
 			return;
 		}
 		service = new ExchangeService(ExchangeVersion.Exchange2010_SP2);
-//		service.setTraceEnabled(true);
 		if (!config.getProxyHost().isEmpty())
 			service.setWebProxy(new WebProxy(config.getProxyHost(), config.getProxyPort(),
 					config.getProxyDomain().isEmpty() ? null : new WebProxyCredentials(
@@ -220,10 +222,23 @@ public class ExchangeMonitor extends AbstractMonitor implements
 
 		String fileName = attach.getName();
 		LOG.debug("Found file attachment with name '{}'", fileName);
-		final boolean isEncrypted = fileName.endsWith(extEnc);
-		if (isEncrypted) fileName = fileName.substring(0, fileName.length() - extEnc.length());
-		final boolean isGzipped = fileName.endsWith(extGz);
-		if (isGzipped) fileName = fileName.substring(0, fileName.length() - extGz.length());
+
+		Matcher matcher = RE_ATTACH_VOL.matcher(fileName);
+		boolean isZipPart = matcher.matches();
+		boolean isExtEnc;
+		boolean isExtGzip;
+		if (isZipPart) {
+			fileName = matcher.group(1) + ".z" + matcher.group(3);
+			isExtEnc = false;
+			isExtGzip = false;
+		} else {
+			isExtEnc = fileName.endsWith(extEnc);
+			if (isExtEnc) fileName = fileName.substring(0, fileName.length() - extEnc.length());
+			isExtGzip = fileName.endsWith(extGz);
+			if (isExtGzip) fileName = fileName.substring(0, fileName.length() - extGz.length());
+		}
+		final boolean isEncrypted = (isZipPart || isExtEnc) && !config.getEmailAttachPassword().isEmpty();
+		final boolean isGzipped = isExtGzip;
 		File attachFile = new File(config.getInboxFolder(), fileName);
 
 		final PipedInputStream input = new PipedInputStream();
@@ -382,21 +397,9 @@ public class ExchangeMonitor extends AbstractMonitor implements
 		}
 		if (tempDir == null) return;
 
-		if (attachSize > maxSize) {
-			// Pack attachment files into ZIP archive divided by volumes
-			try {
-				zipDir = Files.createTempDirectory("eb-zip-").toFile();
-				LOG.debug("Created temporary folder '{}' for ZIP volumes", zipDir.getAbsolutePath());
-				ZipFile zip = new ZipFile(new File(zipDir, UUID.randomUUID().toString() + ZIP_EXT));
-				ZipParameters parameters = new ZipParameters();
-				parameters.setCompressionMethod(Zip4jConstants.COMP_STORE);
-				parameters.setIncludeRootFolder(false);
-				zip.createZipFileFromFolder(tempDir, parameters, true, maxSize);
-				LOG.debug("ZIP volumes created: {}", zip.getSplitZipFiles());
-			} catch (ZipException | IOException e) {
-				LOG.error(e.getMessage(), e);
-			}
-		}
+		// If total amount of attachment files is too big then pack them into ZIP archive divided by volumes
+		if (attachSize > maxSize)
+			zipDir = packAttachmentFiles(tempDir, maxSize);
 
 		int messages = 0;
 		try {
@@ -404,7 +407,6 @@ public class ExchangeMonitor extends AbstractMonitor implements
 			if (zipDir != null) messages += sendFilesFromDirOnePerEmail(zipDir);
 			else messages += sendFilesFromDirAsOneEmail(tempDir);
 		} finally {
-			// Remove all temporary files
 			removeTempDir(tempDir);
 			removeTempDir(zipDir);
 		}
@@ -418,6 +420,44 @@ public class ExchangeMonitor extends AbstractMonitor implements
 		}
 
 		LOG.info("Sent {} message(s)", messages);
+	}
+
+	private File packAttachmentFiles(File dir, long maxSize) {
+		try {
+			File zipDir = Files.createTempDirectory("eb-zip-").toFile();
+			LOG.debug("Created temporary folder '{}' for ZIP volumes", zipDir.getAbsolutePath());
+			ZipFile zip = new ZipFile(new File(zipDir, UUID.randomUUID().toString() + ZIP_EXT));
+			ZipParameters parameters = new ZipParameters();
+			parameters.setCompressionMethod(Zip4jConstants.COMP_STORE);
+			parameters.setIncludeRootFolder(false);
+			zip.createZipFileFromFolder(dir, parameters, true, maxSize);
+			LOG.debug("ZIP volumes created: {}", zip.getSplitZipFiles());
+
+			@SuppressWarnings("unchecked") List<String> zipParts = zip.getSplitZipFiles();
+			for (String zipPartName : zipParts) {
+				File zipPartFile = new File(zipPartName);
+				File attachPartFile = new File(zipPartName + config.getEmailAttachExtEnc());
+				if (!config.getEmailAttachPassword().isEmpty()) {
+					try (final InputStream is = new BufferedInputStream(new FileInputStream(zipPartFile));
+							 final OutputStream os = new BufferedOutputStream(new FileOutputStream(attachPartFile))) {
+						EncryptUtil.encrypt(config.getEmailAttachPassword(), is, os);
+					}
+					if (zipPartFile.delete()) {
+						LOG.debug("Original part '{}' removed successfully", zipPartName);
+						if (attachPartFile.renameTo(zipPartFile))
+							LOG.debug("Encoded part '{}' successfully renamed to '{}'",
+									attachPartFile.getName(), zipPartFile.getName());
+						else
+							LOG.warn("Cannot rename encoded part '{}' to '{}'",
+									attachPartFile.getName(), zipPartFile.getName());
+					} else LOG.warn("Cannot remove original part '{}'", zipPartName);
+				}
+			}
+			return zipDir;
+		} catch (ZipException | IOException e) {
+			LOG.error(e.getMessage(), e);
+			return null;
+		}
 	}
 
 	private EmailMessage createEmailMessage() throws Exception {
@@ -466,7 +506,7 @@ public class ExchangeMonitor extends AbstractMonitor implements
 		try {
 			for (File file : files) {
 				final EmailMessage msg = createEmailMessage();
-				String fileName = file.getName().replaceFirst("\\.", "_" + files.length + ".");
+				String fileName = file.getName().replaceFirst("\\.z", "_" + files.length + ".");
 				final Object[] params = {config.getEmailTagOutgoing(), new Date(), fileName};
 				msg.setSubject(Utils.makeTeaser(config.getEmailSubjectFormat().format(params), 78, "..."));
 				msg.setBody(MessageBody.getMessageBodyFromText(config.getEmailBodyFormat().format(params)));
