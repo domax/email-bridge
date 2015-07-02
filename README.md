@@ -333,7 +333,8 @@ and [git-am] commands respectively. You may find them usable in case if:
 * Git bundle that encloses all commits into one file may be too big for one
   email message, especially when you move the big project initially, so that
   splitting it to multiple patch files will simplify to transfer it by multiple
-  emails.
+  emails. (Though, this issue was resolved by adding gathered attachments into
+  solid package and splitting this package to several parts).
 
 The approach of getting and restore data is almost the same as in previous
 section, except key Git commands and file format.
@@ -466,6 +467,8 @@ References
 TODO
 ----
 
+0. Fix bug if inbox folder isn't exist - it should be tried to create.
+0. Re-factor code to operate only with ZIP archives/volumes as transport attachments.
 0. Add setting to delete emails into Trash folder instead of hard remove.
 0. Add additional filtering emails by sender.
 0. Setup ESW folder for data exchange, extend Config accordingly.
