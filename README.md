@@ -9,6 +9,37 @@ These dedicated folders are designed to keep the intermediate data files that
 are in fact the patches or bundles of Git or other VCS system.
 This bridge is duplex - so that you can exchange data in both directions.
 
+Contents
+--------
+
+1. [The Short Explanation](#the-short-explanation)
+2. [How It Works In A Nutshell](#how-it-works-in-a-nutshell)
+   1. [The Overall Diagram](#the-overall-diagram)
+3. [Build And Run](#build-and-run)
+   1. [Prerequisites](#prerequisites)
+   2. [Build](#build)
+   3. [Run](#run)
+   4. [Notices](#notices)
+4. [Usage](#usage)
+   1. [Configuration file](#configuration-file)
+      1. [EWS Settings](#ews-settings)
+      2. [Test bridge on one node](#test-bridge-on-one-node)
+      3. [Both sides use the same EWS server](#both-sides-use-the-same-ews-server)
+      4. [Each side uses its own EWS server](#each-side-uses-its-own-ews-server)
+   2. [Git Bundle Mode](#git-bundle-mode)
+      1. [Case 1. Existing repo on Side 1 and new empty repo on Side 2
+         ](#case-1-existing-repo-on-side-1-and-new-empty-repo-on-side-2)
+      2. [Case 2. Changes are committed on Side 1, need to be pushed to Side 2
+         ](#case-2-changes-are-committed-on-side-1-need-to-be-pushed-to-side-2)
+   3. [Git Email Mode](#git-email-mode)
+      1. [Get full patch set from the beginning](#get-full-patch-set-from-the-beginning)
+      2. [Get partial patch set from tagged commit](#get-partial-patch-set-from-tagged-commit)
+      3. [Restore the patch set](#restore-the-patch-set)
+   4. [Post-Receive Script](#post-receive-script)
+   5. [Tune Logging](#tune-logging)
+5. [References](#references)
+6. [TODO](#todo)
+
 The Short Explanation
 ---------------------
 
@@ -24,7 +55,7 @@ initial conditions:
   non-detectable (encrypted) attachments.
 * Only files (not sub-folders) are synchronized between computers. That's 
   by design limitation, b/c application's `inbox` and `outbox` purpose is to
-  temporarily keep VCS (Git) patches or bundles that in fact is plain list, so
+  temporarily keep VCS ([Git]) patches or bundles that in fact is plain list, so
   that any kind of file hierarchy support is business of VCS.
 
 How It Works In A Nutshell
@@ -54,7 +85,7 @@ Both sides have symmetric settings and work in absolutely the same manner.
 So the main flow may look like that:
 
 1. User of "Side 1" puts file or files into `outbox` folder (these files are
-   intended to be the result of Git command - see the **"Usage"** section below
+   intended to be the result of [Git] command - see the **"Usage"** section below
    for details).
 2. App on "Side 1" detects that new files are appeared in `outbox` and creates
    new Email message(s) where attaches these files (packed and/or encrypted if
@@ -64,7 +95,7 @@ So the main flow may look like that:
 4. App on "Side 2" detects that new email is available, so receives it and
    processes to obtain files from attachments and puts these files into `inbox`
    folder in its original representation (decrypted and/or unpacked).
-5. User of "Side 2" runs appropriate commands (e.g. Git) to apply new changes 
+5. User of "Side 2" runs appropriate commands (e.g. [Git]) to apply new changes 
    represented by these files, and cleans up the `inbox` folder.
 
 The last point may be automated as well - see **"Post-Receive Script"** section
@@ -75,11 +106,17 @@ Build And Run
 
 ### Prerequisites ###
 
-To build and run this application you need:
+To build this application you need:
 
-* Java 7+;
-* Maven 3+;
+* JDK 7+;
+* [Maven](https://maven.apache.org/) 3+;
 * Internet connection.
+
+To run:
+
+* JRE/JDK 7+;
+* [Git];
+* If OS is Windows - [Cygwin] - optional but recommended.
 
 ### Build ###
 
@@ -89,19 +126,17 @@ the following command:
     $ mvn clean package
 
 ### Run ###
-        
+
 If build is successful, you can run the resulting JAR file as standalone Java
 app like that:
 
-    $ java -jar target/email-bridge-X.X.X-standalone.jar
-
-Where `X.X.X` is current version number.
+    $ java -jar target/email-bridge-0.1.2-standalone.jar
 
 The invocation w/o arguments will show an error that proper configuration file
 is required. Just in case - you can get the short help about supported command
 line arguments by specifying `-h` option:
 
-    $ java -jar target/email-bridge-X.X.X-standalone.jar -h
+    $ java -jar target/email-bridge-0.1.2-standalone.jar -h
 
 ### Notices ###
 
@@ -457,12 +492,14 @@ References
 3. [Prepare patches for e-mail submission][git-format-patch]
 4. [Apply a series of patches from a mailbox][git-am]
 5. [Cygwin Project][Cygwin]
+6. [Git VCS][Git]
 
 [ews-java-api]: https://github.com/OfficeDev/ews-java-api
 [git-bundle]: http://git-scm.com/docs/git-bundle
 [git-format-patch]: http://git-scm.com/docs/git-format-patch
 [git-am]: http://git-scm.com/docs/git-am
 [Cygwin]: http://cygwin.org/
+[Git]: https://git-scm.com/downloads
 
 TODO
 ----

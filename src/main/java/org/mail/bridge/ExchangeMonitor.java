@@ -77,20 +77,20 @@ public class ExchangeMonitor extends AbstractMonitor implements
 	private static final Pattern RE_ZIP_VOL = compile("^(" + RE_UUID + ")_(\\d+)\\.z\\d{2}$", CASE_INSENSITIVE);
 	private static final String ZIP_EXT = ".z00";
 
-	public static class NewMailMessage extends Message<List<ItemId>> {
-		public NewMailMessage(List<ItemId> emails) {
+	static class NewMailMessage extends Message<List<ItemId>> {
+		NewMailMessage(List<ItemId> emails) {
 			super(emails);
 		}
 	}
 
-	public static class ReopenMonitorMessage extends Message<Void> {
-		public ReopenMonitorMessage() {
+	static class ReopenMonitorMessage extends Message<Void> {
+		ReopenMonitorMessage() {
 			super(null);
 		}
 	}
 
-	public static class NewIncomingFilesMessage extends Message<List<File>> {
-		public NewIncomingFilesMessage(List<File> files) {
+	static class NewIncomingFilesMessage extends Message<List<File>> {
+		NewIncomingFilesMessage(List<File> files) {
 			super(files);
 		}
 	}
@@ -98,7 +98,7 @@ public class ExchangeMonitor extends AbstractMonitor implements
 	private final Config config;
 	private ExchangeService service;
 
-	public ExchangeMonitor(Config config) {
+	ExchangeMonitor(Config config) {
 		this.config = config;
 		LOG.debug("Instantiated");
 	}
@@ -130,19 +130,19 @@ public class ExchangeMonitor extends AbstractMonitor implements
 		}
 	}
 
-	public ExchangeMonitor addStopCallback(MonitorCallback<String> callback) {
+	ExchangeMonitor addStopCallback(MonitorCallback<String> callback) {
 		return (ExchangeMonitor) addCallback(Main.StopMessage.class, callback);
 	}
 
-	public ExchangeMonitor addNewMailCallback(MonitorCallback<List<ItemId>> callback) {
+	ExchangeMonitor addNewMailCallback(MonitorCallback<List<ItemId>> callback) {
 		return (ExchangeMonitor) addCallback(NewMailMessage.class, callback);
 	}
 
-	public ExchangeMonitor addReopenMonitorCallback(MonitorCallback<Void> callback) {
+	ExchangeMonitor addReopenMonitorCallback(MonitorCallback<Void> callback) {
 		return (ExchangeMonitor) addCallback(ReopenMonitorMessage.class, callback);
 	}
 
-	public ExchangeMonitor addIncomingFilesReadyCallback(MonitorCallback<List<File>> callback) {
+	ExchangeMonitor addIncomingFilesReadyCallback(MonitorCallback<List<File>> callback) {
 		return (ExchangeMonitor) addCallback(NewIncomingFilesMessage.class, callback);
 	}
 
@@ -375,7 +375,7 @@ public class ExchangeMonitor extends AbstractMonitor implements
 			postMessage(new ReopenMonitorMessage());
 	}
 
-	public synchronized void sendFiles(List<File> files) {
+	synchronized void sendFiles(List<File> files) {
 		if (Utils.isEmpty(files)) return;
 		LOG.info("Sending files '{}'", files);
 
@@ -558,7 +558,7 @@ public class ExchangeMonitor extends AbstractMonitor implements
 		else LOG.error("Cannot remove temporary folder '{}'", dir.getAbsolutePath());
 	}
 
-	public synchronized void processNewMail(List<ItemId> newMailsIds) {
+	synchronized void processNewMail(List<ItemId> newMailsIds) {
 		LOG.info("Start new mail processing - {} message(s)", newMailsIds.size());
 		try {
 			ServiceResponseCollection<GetItemResponse> responses =

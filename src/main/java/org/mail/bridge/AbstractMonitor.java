@@ -33,11 +33,12 @@ import java.util.Map;
 /**
  * @author <a href="mailto:max@dominichenko.com">Maksym Dominichenko</a>
  */
+@SuppressWarnings("UnusedReturnValue")
 public abstract class AbstractMonitor {
 
 	private final Map<Class<? extends Message<?>>, List<MonitorCallback<?>>> callbacks = new HashMap<>();
 
-	protected <T> AbstractMonitor addCallback(Class<? extends Message<T>> messageClass, MonitorCallback<T> callback) {
+	<T> AbstractMonitor addCallback(Class<? extends Message<T>> messageClass, MonitorCallback<T> callback) {
 		if (callback != null) {
 			List<MonitorCallback<?>> callbackList = callbacks.get(messageClass);
 			if (callbackList == null) {
@@ -50,7 +51,7 @@ public abstract class AbstractMonitor {
 	}
 
 	@SuppressWarnings({"unchecked", "SuspiciousMethodCalls"})
-	protected <T> void postMessage(Message<T> message) {
+	<T> void postMessage(Message<T> message) {
 		List callbackList = Utils.ensureEmpty(callbacks.get(message.getClass()));
 		for (MonitorCallback<T> callback : (List<MonitorCallback<T>>) callbackList)
 			callback.onMessage(message);

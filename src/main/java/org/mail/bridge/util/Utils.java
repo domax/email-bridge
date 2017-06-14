@@ -29,7 +29,7 @@ import java.util.*;
 /**
  * @author <a href="mailto:max@dominichenko.com">Maksym Dominichenko</a>
  */
-@SuppressWarnings("unused")
+@SuppressWarnings({"unused", "WeakerAccess", "SameParameterValue"})
 public class Utils {
 
 	public static final Comparator<File> LAST_MODIFIED_COMPARATOR = new Comparator<File>() {

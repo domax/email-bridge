@@ -48,8 +48,8 @@ public class FolderMonitor extends AbstractMonitor implements Runnable {
 	private static final long NEW_FILES_PROCESS_DELAY = 1000;
 	private static final int SCRIPT_TIMEOUT = 60000;
 
-	public static class SendFileMessage extends Message<List<File>> {
-		public SendFileMessage(List<File> data) {
+	static class SendFileMessage extends Message<List<File>> {
+		SendFileMessage(List<File> data) {
 			super(data);
 		}
 	}
@@ -84,7 +84,7 @@ public class FolderMonitor extends AbstractMonitor implements Runnable {
 		}
 	};
 
-	public FolderMonitor(Config config) throws IOException {
+	FolderMonitor(Config config) throws IOException {
 		this.config = config;
 		outboxFolder = new File(config.getOutboxFolder());
 		if (outboxFolder.exists()) {
@@ -97,11 +97,11 @@ public class FolderMonitor extends AbstractMonitor implements Runnable {
 		LOG.debug("Instantiated");
 	}
 
-	public FolderMonitor addStopCallback(MonitorCallback<String> callback) {
+	FolderMonitor addStopCallback(MonitorCallback<String> callback) {
 		return (FolderMonitor) addCallback(Main.StopMessage.class, callback);
 	}
 
-	public FolderMonitor addSendFileCallback(MonitorCallback<List<File>> callback) {
+	FolderMonitor addSendFileCallback(MonitorCallback<List<File>> callback) {
 		return (FolderMonitor) addCallback(SendFileMessage.class, callback);
 	}
 
@@ -111,7 +111,7 @@ public class FolderMonitor extends AbstractMonitor implements Runnable {
 		postMessage(new SendFileMessage(files));
 	}
 
-	public synchronized void runScriptAgainstReceivedFiles(List<File> inboxFiles) {
+	synchronized void runScriptAgainstReceivedFiles(List<File> inboxFiles) {
 		if (config.getInboxScript().isEmpty() || Utils.isEmpty(inboxFiles)) return;
 		LOG.debug("Run script '{}' against files {}", config.getInboxScript(), inboxFiles);
 		ByteArrayOutputStream out = new ByteArrayOutputStream();

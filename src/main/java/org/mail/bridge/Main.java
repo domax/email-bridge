@@ -31,7 +31,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
@@ -42,8 +44,8 @@ public class Main implements Runnable {
 
 	private static final Logger LOG = LoggerFactory.getLogger(Main.class);
 
-	public static class StopMessage extends Message<String> {
-		public StopMessage(String stopMessage) {
+	static class StopMessage extends Message<String> {
+		StopMessage(String stopMessage) {
 			super(stopMessage);
 		}
 	}
@@ -51,6 +53,7 @@ public class Main implements Runnable {
 	private final FolderMonitor folderMonitor;
 	private final ExchangeMonitor exchangeMonitor;
 	private final ConcurrentLinkedDeque<Message<?>> messages = new ConcurrentLinkedDeque<>();
+	private final File pidFile;
 
 	public static void main(String[] args) throws Exception {
 		ArgumentParser parser = ArgumentParsers.newArgumentParser(Main.class.getSimpleName());
@@ -63,7 +66,7 @@ public class Main implements Runnable {
 		new Main(config);
 	}
 
-	Main(Config config) throws IOException {
+	private Main(Config config) throws IOException {
 		folderMonitor = new FolderMonitor(config)
 				.addStopCallback(new MonitorCallback<String>() {
 					@Override
@@ -102,6 +105,11 @@ public class Main implements Runnable {
 						postMessage(message);
 					}
 				});
+		pidFile = config.getPidFile().isEmpty() ? null : new File(config.getPidFile());
+		if (pidFile != null) {
+			if (pidFile.exists() && pidFile.delete()) LOG.debug("Old PID file was removed");
+			if (!config.isPidFileKeep()) pidFile.deleteOnExit();
+		}
 		new Thread(this, Main.class.getSimpleName()).start();
 	}
 
@@ -111,6 +119,23 @@ public class Main implements Runnable {
 
 	@Override
 	public void run() {
+		if (pidFile != null) {
+			long pid;
+			try {
+				pid = Long.parseLong(ManagementFactory.getRuntimeMXBean().getName().split("@", 2)[0]);
+			} catch (Exception e) {
+				LOG.error("Cannot retrieve the PID of current process", e);
+				return;
+			}
+			try (FileOutputStream os = new FileOutputStream(pidFile)) {
+				os.write(String.valueOf(pid).getBytes());
+				os.flush();
+			} catch (Exception e) {
+				LOG.error("Cannot cannot write PID file", e);
+				return;
+			}
+		}
+
 		exchangeMonitor.scan().monitor();
 		folderMonitor.scan().monitor();
 		while (true) {
@@ -141,5 +166,7 @@ public class Main implements Runnable {
 				break;
 			}
 		}
+
+
 	}
 }

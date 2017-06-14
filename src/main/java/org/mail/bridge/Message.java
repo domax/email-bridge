@@ -30,11 +30,11 @@ public class Message<T> {
 
 	private final T data;
 
-	public Message(T data) {
+	Message(T data) {
 		this.data = data;
 	}
 
-	public T getData() {
+	T getData() {
 		return data;
 	}
 

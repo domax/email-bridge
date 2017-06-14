@@ -82,6 +82,9 @@ public class Config {
 	private final String emailAttachExtEnc;
 	private final int emailAttachMaxSize;
 
+	private final String pidFile;
+	private final boolean pidFileKeep;
+
 	public Config(String propertiesFileName) throws IOException {
 		Properties config = new Properties();
 		config.load(new FileInputStream(propertiesFileName));
@@ -165,133 +168,145 @@ public class Config {
 		emailAttachExtEnc = checkExt(s.isEmpty() ? ".enc" : s);
 		s = config.getProperty("email.attach.max.size", "");
 		emailAttachMaxSize = s.isEmpty() ? 5 : Integer.parseInt(s);
+
+		pidFile = config.getProperty("pid.file", "");
+		s = config.getProperty("pid.file.keep", "");
+		pidFileKeep = !s.isEmpty() && Boolean.parseBoolean(s);
 	}
 
-	public String getEwsEmail() {
+	String getEwsEmail() {
 		return ewsEmail;
 	}
 
-	public String getEwsDomain() {
+	String getEwsDomain() {
 		return ewsDomain;
 	}
 
-	public String getEwsUsername() {
+	String getEwsUsername() {
 		return ewsUsername;
 	}
 
-	public String getEwsPassword() {
+	String getEwsPassword() {
 		return ewsPassword;
 	}
 
-	public String getEwsServer() {
+	String getEwsServer() {
 		return ewsServer;
 	}
 
-	public int getEwsViewSize() {
+	int getEwsViewSize() {
 		return ewsViewSize;
 	}
 
-	public int getEwsSubscriptionLifetime() {
+	int getEwsSubscriptionLifetime() {
 		return ewsSubscriptionLifetime;
 	}
 
-	public String getProxyHost() {
+	String getProxyHost() {
 		return proxyHost;
 	}
 
-	public int getProxyPort() {
+	int getProxyPort() {
 		return proxyPort;
 	}
 
-	public String getProxyUsername() {
+	String getProxyUsername() {
 		return proxyUsername;
 	}
 
-	public String getProxyPassword() {
+	String getProxyPassword() {
 		return proxyPassword;
 	}
 
-	public String getProxyDomain() {
+	String getProxyDomain() {
 		return proxyDomain;
 	}
 
-	public String getOutboxFolder() {
+	String getOutboxFolder() {
 		return outboxFolder;
 	}
 
-	public boolean isOutboxCleanup() {
+	boolean isOutboxCleanup() {
 		return outboxCleanup;
 	}
 
-	public String getOutboxFileRegexp() {
+	String getOutboxFileRegexp() {
 		return outboxFileRegexp;
 	}
 
-	public String getInboxFolder() {
+	String getInboxFolder() {
 		return inboxFolder;
 	}
 
-	public String getInboxScript() {
+	String getInboxScript() {
 		return inboxScript;
 	}
 
-	public int getInboxScriptStopCode() {
+	int getInboxScriptStopCode() {
 		return inboxScriptStopCode;
 	}
 
-	public boolean isEmailInboxCleanup() {
+	boolean isEmailInboxCleanup() {
 		return emailInboxCleanup;
 	}
 
-	public String getEmailTagIncoming() {
+	String getEmailTagIncoming() {
 		return emailTagIncoming;
 	}
 
-	public String getEmailTagOutgoing() {
+	String getEmailTagOutgoing() {
 		return emailTagOutgoing;
 	}
 
-	public MessageFormat getEmailSubjectFormat() {
+	MessageFormat getEmailSubjectFormat() {
 		return emailSubjectFormat;
 	}
 
-	public MessageFormat getEmailBodyFormat() {
+	MessageFormat getEmailBodyFormat() {
 		return emailBodyFormat;
 	}
 
-	public String[] getEmailRecipientsTo() {
+	String[] getEmailRecipientsTo() {
 		return emailRecipientsTo;
 	}
 
-	public String[] getEmailRecipientsCc() {
+	String[] getEmailRecipientsCc() {
 		return emailRecipientsCc;
 	}
 
-	public String[] getEmailRecipientsBcc() {
+	String[] getEmailRecipientsBcc() {
 		return emailRecipientsBcc;
 	}
 
-	public String getEmailAttachPassword() {
+	String getEmailAttachPassword() {
 		return emailAttachPassword;
 	}
 
-	public boolean isEmailAttachGzip() {
+	boolean isEmailAttachGzip() {
 		return emailAttachGzip;
 	}
 
-	public String getEmailAttachExtGzip() {
+	String getEmailAttachExtGzip() {
 		return emailAttachExtGzip;
 	}
 
-	public String getEmailAttachExtEnc() {
+	String getEmailAttachExtEnc() {
 		return emailAttachExtEnc;
 	}
 
-	public int getEmailAttachMaxSize() {
+	int getEmailAttachMaxSize() {
 		return emailAttachMaxSize;
 	}
 
-	public Map<String, String> asEnvironmentMap() {
+	String getPidFile() {
+		return pidFile;
+	}
+
+	boolean isPidFileKeep() {
+		return pidFileKeep;
+	}
+
+	Map<String, String> asEnvironmentMap() {
 		Map<String, String> result = new HashMap<>();
 		result.put("EWS_EMAIL", ewsEmail);
 		result.put("EWS_DOMAIN", ewsDomain);
@@ -324,6 +339,8 @@ public class Config {
 		result.put("EMAIL_ATTACH_EXT_GZIP", emailAttachExtGzip);
 		result.put("EMAIL_ATTACH_EXT_ENC", emailAttachExtEnc);
 		result.put("EMAIL_ATTACH_MAX_SIZE", "" + emailAttachMaxSize);
+		result.put("PID_FILE", pidFile);
+		result.put("PID_FILE_KEEP", "" + pidFileKeep);
 		return result;
 	}
 
@@ -367,6 +384,8 @@ public class Config {
 				",\n\temailAttachExtGzip='" + emailAttachExtGzip + '\'' +
 				",\n\temailAttachExtEnc='" + emailAttachExtEnc + '\'' +
 				",\n\temailAttachMaxSize=" + emailAttachMaxSize +
+				",\n\tpidFile='" + pidFile + '\'' +
+				",\n\tpidFileKeep=" + pidFileKeep +
 				'}';
 	}
 }

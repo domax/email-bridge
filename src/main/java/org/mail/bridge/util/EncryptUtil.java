@@ -100,9 +100,10 @@ public class EncryptUtil {
 		}
 	}
 
-	public static void gzipEncrypt(String password,
-																 final InputStream clearData,
-																 OutputStream cipherData) throws IOException {
+	public static void gzipEncrypt(
+			String password,
+			final InputStream clearData,
+			OutputStream cipherData) throws IOException {
 		final PipedOutputStream output = new PipedOutputStream();
 		final PipedInputStream input = new PipedInputStream(output);
 		final Thread thread = new Thread(new Runnable() {
@@ -120,9 +121,10 @@ public class EncryptUtil {
 		encrypt(password, input, cipherData);
 	}
 
-	public static void decryptGunzip(final String password,
-																	 final InputStream cipherData,
-																	 OutputStream clearData) throws IOException {
+	public static void decryptGunzip(
+			final String password,
+			final InputStream cipherData,
+			OutputStream clearData) throws IOException {
 		final PipedOutputStream output = new PipedOutputStream();
 		final PipedInputStream input = new PipedInputStream(output);
 		final Thread thread = new Thread(new Runnable() {
