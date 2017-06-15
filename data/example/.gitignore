@@ -1,0 +1,5 @@
+inbox/
+outbox/
+app.pid
+app.log
+config-*.properties
