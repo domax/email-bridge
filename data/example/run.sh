@@ -21,7 +21,7 @@ if [ -z "$PID_FILE" ]; then
 fi
 PID="`cat $PID_FILE 2>/dev/null`"
 if [ -n "$PID" -a "$OSTYPE" = "cygwin" ]; then
-	PID="`ps | awk "{if (\$4 == $PID) print \$1}"`"
+	PID="`ps | awk "{if (\\$4 == $PID) print \\$1}"`"
 fi
 
 function start() {
