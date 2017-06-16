@@ -36,7 +36,7 @@ Contents
       2. [Get partial patch set from tagged commit](#get-partial-patch-set-from-tagged-commit)
       3. [Restore the patch set](#restore-the-patch-set)
    4. [Post-Receive Script](#post-receive-script)
-   5. [Tune Logging](#tune-logging)
+   5. [Example](#example)
 5. [References](#references)
 6. [TODO](#todo)
 
@@ -480,9 +480,31 @@ only - no conflict resolving, no error handling, etc.
 Also, order of incoming files is important and you cannot apply the same bundle
 twice to the same branch.
 
-### Tune Logging ###
+### Example ###
 
-[TBD]
+There is [set of scripts](data/example) that was setup to synchronize this repository.
+To correctly launch the app from there, just do the following:
+
+1. Build application using command `mvn clean package`
+2. Go to `data/example` folder and copy `config.properties` into `config-settings.properties`
+   to prevent your private setting to be committed into Git.
+3. Change `config-settings.properties` according your EWS credentials. 
+   The following keys should be changed:
+   * `ews.email`
+   * `ews.domain`
+   * `ews.username`
+   * `ews.password`
+   * `email.recipients.to`
+   * `email.attach.password` (optional, but recommended)
+4. Run email-bridge with the command: `CFG_FILE=config-settings.properties ./run.sh start`<br>
+   don't specify full path for `CFG_FILE`, b/c script looks for it relatively itself.
+
+If you see the success message the application was launched and runs in the background.
+You may inspect log in `data/example/app.log` file.
+
+To check if application is running, use command `./run.sh status`.
+
+To stop application: `./run.sh stop`; to restart: `./run.sh restart`.
 
 References
 ----------
